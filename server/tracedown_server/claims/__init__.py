@@ -91,7 +91,9 @@ def terms(text: str) -> List[Tuple[str, int, int, str]]:
 
 # ----------------------------------------------------------------------------- claims
 
-_SENT = re.compile(r"[^.!?\n]+(?:[.!?]+|$)", re.M)
+# A period ends a sentence only before whitespace or the end: "$4.2 billion", "example.com" and
+# "e.g." stay whole.
+_SENT = re.compile(r"(?:[^.!?\n]|\.(?=\S))+(?:[.!?]+|$)", re.M)
 _CLAUSE = re.compile(r";\s+|,\s+(?:and|but|while|whereas)\s+|\s+and\s+(?=(?:includes?|offers?|has|have|is|are|was|"
                      r"were|will|costs?|provides?|supports?|gives?|requires?|takes?)\b)")
 

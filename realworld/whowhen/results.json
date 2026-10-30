@@ -99,8 +99,8 @@
     "n": 58,
     "ours": {
       "Tracedown (rules only)": {
-        "agent": 34.48275862068966,
-        "step": 10.344827586206897,
+        "agent": 51.724137931034484,
+        "step": 18.96551724137931,
         "step@3": 31.03448275862069
       },
       "baseline: first failure-looking output": {
@@ -147,8 +147,8 @@
     "n": 58,
     "ours": {
       "Tracedown (rules only)": {
-        "agent": 34.48275862068966,
-        "step": 10.344827586206897,
+        "agent": 51.724137931034484,
+        "step": 18.96551724137931,
         "step@3": 31.03448275862069
       },
       "baseline: first failure-looking output": {

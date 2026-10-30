@@ -20,6 +20,7 @@ enterprise = ["pyjwt[crypto]>=2.8", "confluent-kafka>=2.3"]
 [project.scripts]
 tracedown-server = "tracedown_server.__main__:main"
 tracedown-worker = "tracedown_server.enterprise.queue:main"
+tracedown-import = "tracedown_server.importers.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["tracedown_server*"]

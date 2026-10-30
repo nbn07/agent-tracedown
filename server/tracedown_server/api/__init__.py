@@ -29,7 +29,7 @@ from ..enterprise.pii import PolicyEngine
 from ..enterprise.rbac import Directory, Principal
 from ..enterprise.sso import OIDC, SSOError
 from ..incidents import hooks
-from ..otlp import otlp_to_abx
+from ..importers import import_otlp
 from ..pipeline import Pipeline
 from ..rca import RunView, analyze
 from ..replay import MODES, diff, plan
@@ -212,9 +212,16 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
         """OTLP/HTTP JSON receiver: any agent emitting OTel GenAI spans works without the TDN SDK."""
         need(p, "ingest", project)
         try:
-            return pipeline.process_spans(project, otlp_to_abx(body))
+            accepted = 0
+            for _, spans, blobs in import_otlp([body]):
+                if blobs:
+                    pipeline.process_blobs(project, blobs)
+                accepted += pipeline.process_spans(project, spans)["accepted"]
+            return {"accepted": accepted}
         except TraceOwnershipError as exc:
             raise HTTPException(409, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
 
     # -------------------------------------------------------------- runs
     @api.get("/runs", tags=["runs"])

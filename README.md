@@ -54,6 +54,42 @@ The demo needs no API keys. It runs agents that fail in realistic ways:
 
 It then repeats one failure to open an incident, ships a prompt change that triggers a drift report, and replays a failure with a fix. Open the UI to explore runs, incidents, drift, analytics and the live feed.
 
+## Already recording with Langfuse, Phoenix or OpenTelemetry?
+
+Diagnose the runs you already have, with no code changes. Everything runs locally unless you add `--send`.
+
+```bash
+pip install ./sdk/python ./server     # from a clone of this repo (see Quick start)
+
+# Langfuse (cloud or self-hosted): every trace with an error in the last day
+export LANGFUSE_PUBLIC_KEY=pk-lf-... LANGFUSE_SECRET_KEY=sk-lf-...   # LANGFUSE_HOST for self-hosted
+tracedown-import langfuse --errors-since 24h
+tracedown-import langfuse --trace-id 7f3a9c... --failed     # a run a user complained about
+
+# Any OpenTelemetry export: OTel GenAI conventions, Arize Phoenix / OpenInference, OpenLLMetry
+tracedown-import otlp traces.json --failed
+
+# A trace exported from the Langfuse UI or API
+tracedown-import langfuse-file trace.json
+```
+
+```
+━━ SupportAgent · trace 5b8efff7… · 6 steps · failure
+  caused by step 4  SupportAgent → refund_order
+              First state-changing call before the failure: refund_order()
+  evidence:   arguments: {"order_id": "#1001"}
+   suspects:
+   1. step 4    Suspect action (first state change): refund_order()
+   2. step 5    Unsupported claim (hallucination): 1 of 2 answer claims not supported by any source
+```
+
+Options:
+- `--send http://localhost:7070` also stores runs in a Tracedown server, with the UI, incidents and drift.
+- `--judge anthropic:claude-haiku-5-5` adds the LLM judge.
+- `--save runs.jsonl` keeps the converted runs.
+
+A Tracedown server also accepts OTLP/JSON directly at `POST /v1/traces`. Try it on the samples in [`examples/imports/`](examples/imports/).
+
 ## Instrument your agent
 
 ```python
@@ -117,8 +153,8 @@ These are synthetic runs from the same ten scenario structures the engine was bu
 
 | | right step, top 1 | right step, top 3 | names the kind of mistake |
 |---|---|---|---|
-| Tracedown (rules only) | 65% | 82% | 1% |
-| Tracedown + LLM judge (Claude Haiku 5.5) | 63% | 82% | 45% |
+| Tracedown (rules only) | 68% | 81% | 1% |
+| Tracedown + LLM judge (Claude Haiku 5.5) | 63% | 81% | 45% |
 | "first state-changing call" baseline | 74% | 74% | 29% |
 
 The rules find the right neighbourhood but lose to a simple prior on the first guess. Most real failures are the right action with the wrong item, which rules cannot see. The optional LLM judge (`TDN_JUDGE`) fixes the *why* (1% → 45% correct mistake kind) but not the *where*. `realworld/live/` also has harnesses that run the OpenAI Agents SDK customer-service example, a LangGraph SQL agent and τ-bench live with your own model.
@@ -144,11 +180,12 @@ The rules find the right neighbourhood but lose to a simple prior on the first g
 ```
 spec/                 TDN telemetry spec (JSON Schema)
 sdk/python/           SDK: tracer, exporters, plugins, framework integrations, redaction
-server/tracedown_server/    API, pipeline, rca/, claims/, drift/, incidents/, analytics, enterprise/, static UI
+server/tracedown_server/    API, pipeline, rca/, claims/, drift/, incidents/, importers/, analytics, enterprise/, static UI
 benchmark/            TDN-RCA-Bench: generator, data, scorer
 docs/                 design, standards proposal (OTel GenAI SIG)
 deploy/               Dockerfile, compose (dev / standard / scale), SQL DDL
-examples/             demo agents and the end-to-end demo
+examples/             demo agents, the end-to-end demo, sample OTel/Langfuse exports (imports/)
+realworld/            evaluation on real failures: τ-bench, Who&When, live harnesses
 ```
 
 ## Standards

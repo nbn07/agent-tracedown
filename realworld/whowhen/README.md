@@ -28,7 +28,7 @@ Ground truth makes no difference to the rules, so one table covers both settings
 
 | | Alg. agent | Alg. step | Alg. step@3 | Hand agent | Hand step | Hand step@3 |
 |---|---|---|---|---|---|---|
-| **Tracedown (rules only)** | **50.8%** | **21.4%** | 33.3% | **34.5%** | **10.3%** | 31.0% |
+| **Tracedown (rules only)** | **50.8%** | **21.4%** | 33.3% | **51.7%** | **19.0%** | 31.0% |
 | Baseline: first failure-looking output | 50.0% | 23.0% | 23.0% | 58.6% | 15.5% | 15.5% |
 | Baseline: last step | 44.4% | 0.8% | 0.8% | 60.3% | 12.1% | 12.1% |
 | Baseline: first agent turn | 49.2% | 15.9% | 15.9% | 31.0% | 1.7% | 1.7% |
@@ -48,7 +48,7 @@ The paper's own results (Table 1, GPT-4o judge) are below, as published. The pap
 ## What it says
 
 - **Algorithm-Generated:** the rules alone are in the range of GPT-4o judges at step level (21% vs 13–26%) and agent level (51% vs 26–54%), at no model cost. They do not beat the simple "first failed code output" baseline (23%).
-- **Hand-Crafted:** with long Magentic-One logs, the rules lose to trivial baselines at agent level (34.5% vs 60% for "last step"). At step level they still beat the paper's GPT-4o methods (10.3% vs 3.5–8.8%), but not "first failure-looking output" (15.5%).
+- **Hand-Crafted:** with long Magentic-One logs, the rules beat the paper's GPT-4o methods and every simple baseline at step level (19.0% vs 3.5–8.8% and 15.5%). At agent level they are in the GPT-4o range (51.7% vs 33–55%) but below "last step" (60.3%).
 - **Sensitivity.** The result depends strongly on whether browsing actions count as state-changing.
   - In a first run, a bug dropped the "read-only" declarations, so browsing counted as state-changing.
   - On Hand-Crafted, that run scored 62.1% agent and 22.4% step, because the first-action prior then points at WebSurfer's first click.
@@ -67,6 +67,8 @@ First run, before both fixes:
 
 ## Caveats
 
-- **AgentDebugX** reports about 29% exact agent-and-step accuracy (Qwen3.5-9B, multi-turn investigation). Our joint agent-and-step accuracy is 21.4% (Algorithm-Generated) and 10.3% (Hand-Crafted), against 23.0% and 15.5% for the first-failure baseline. Their setting and scoring may differ, so treat the comparison as indicative only.
+- **AgentDebugX** reports about 29% exact agent-and-step accuracy (Qwen3.5-9B, multi-turn investigation). Our joint agent-and-step accuracy is 21.4% (Algorithm-Generated) and 19.0% (Hand-Crafted), against 23.0% and 15.5% for the first-failure baseline. Their setting and scoring may differ, so treat the comparison as indicative only.
 - **Mistake steps count every history entry,** including code output and the human request; the converter keeps that index exactly.
 - **The LLM judge was not run here,** because no API key was available.
+
+3. **Claim splitter bug (found 2026-10-30 while building the Langfuse/OTel importer, not on this data).** The hallucination investigator split sentences at every period, so "$4.2 billion" or "example.com" became two bogus claims that no source supported. Hand-Crafted logs are full of URLs and decimals, so false "unsupported claim" findings outranked the real suspects. After the fix, Hand-Crafted went from 34.5% agent / 10.3% step to 51.7% / 19.0%; Algorithm-Generated is unchanged. The fix is generic (a sentence ends only at a period followed by whitespace) and no rule was tuned on Who&When.

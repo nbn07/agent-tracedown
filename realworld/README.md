@@ -18,20 +18,20 @@ Held-out test split, 499 failed runs (383 with a single cause step), rules only:
 
 | System | loc@1 | loc@3 | Category agrees |
 |---|---|---|---|
-| **Tracedown** | **65%** | **82%** | 1% |
+| **Tracedown** | **68%** | **81%** | 1% |
 | Baseline: first write call | 74% | 74% | 29% |
 | Baseline: last write call | 55% | 55% | 29% |
 | Baseline: last LLM turn | 21% | 21% | 42% |
 | Baseline: first tool error | 13% | 13% | 0% |
 
-What this says: without a model, Tracedown has the right step in its top three 82% of the time, but its first guess is worse than "blame the first state-changing call", and it almost never names the *kind* of mistake. These failures are semantic (the right action with the wrong order or item), which rules cannot see.
+What this says: without a model, Tracedown has the right step in its top three 81% of the time, but its first guess is worse than "blame the first state-changing call", and it almost never names the *kind* of mistake. These failures are semantic (the right action with the wrong order or item), which rules cannot see.
 
 **With the LLM judge** (Claude Haiku 5.5, one run on test after tuning on dev; details in [LABELING.md](LABELING.md)):
 
 | System | loc@1 | loc@3 | Category agrees |
 |---|---|---|---|
-| Tracedown + judge | 63% | 82% | **45%** |
-| Tracedown, rules only | 65% | 82% | 1% |
+| Tracedown + judge | 63% | 81% | **45%** |
+| Tracedown, rules only | 68% | 81% | 1% |
 | Baseline: first write call | 74% | 74% | 29% |
 | Baseline: last LLM turn | 21% | 21% | 42% (always the same answer) |
 
@@ -41,7 +41,7 @@ The judge names the right kind of mistake for about half of wrong actions and wr
 
 ## 1b. Who&When (public failure-attribution benchmark)
 
-184 multi-agent failure logs with labelled culprit agent and step. Rules only, exact match: step accuracy 21% (algorithm-generated) and 10% (hand-crafted), in the range of the paper's GPT-4o judges but below a "first failed output" baseline (23% / 16%). Details and caveats: [whowhen/README.md](whowhen/README.md).
+184 multi-agent failure logs with labelled culprit agent and step. Rules only, exact match: step accuracy 21% (algorithm-generated) and 19% (hand-crafted). That is in the range of the paper's GPT-4o judges, and on the hand-crafted set above them and above a "first failed output" baseline (23% / 16%), though not on the algorithm-generated set. Details and caveats: [whowhen/README.md](whowhen/README.md).
 
 ## 2. Live harnesses around real agent projects (your model, your key)
 

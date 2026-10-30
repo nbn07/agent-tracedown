@@ -91,6 +91,8 @@ Test split, single run (`results-test-judge-haiku-5-5.json`):
 |---|---|---|---|
 | Tracedown, rules only | 65% | 82% | 1% |
 | Tracedown + judge (Claude Haiku 5.5) | 63% | 82% | 45% |
+
+(Numbers as first reported; see change 3 below for the current ones.)
 | Baseline: first write call | 74% | 74% | 29% |
 | Baseline: last LLM turn | 21% | 21% | 42% |
 
@@ -115,3 +117,20 @@ Each harness has `--fake`, a scripted model with deliberate bugs, so the plumbin
 Building the harnesses found two bugs in the OpenAI Agents SDK adapter, both fixed: tool arguments were not recorded (the SDK fills them in after the span starts), and handoff targets showed as `None` (only known when the handoff resolves). The τ-bench numbers above do not use that adapter and are unaffected.
 
 First live results (Claude Haiku 5.5) are in `README.md`. Runs that ended in an API error (rate limits on the first attempt) were discarded and rerun with retries; they are never counted as agent failures.
+
+## Change 3: claim splitter bug (2026-10-30, after the test runs)
+
+Found while building the Langfuse/OpenTelemetry importer, on a hand-written example rather than on τ-bench or Who&When data. The hallucination investigator split sentences at every period, so "$4.2 billion" or "example.com" became fragments that no source supported, producing false "unsupported claim" findings. A sentence now ends only at a period followed by whitespace or the end of the text. Nothing else changed.
+
+Effect, reported both ways:
+
+| | Before | After |
+|---|---|---|
+| τ-bench test, rules only (loc@1 / loc@3) | 65% / 82% | 68% / 81% |
+| τ-bench dev, rules only | 67% / 83% | 68% / 84% |
+| τ-bench test, + judge (cached answers) | 63% / 82% | 63% / 81% |
+| Who&When Hand-Crafted (agent / step) | 34.5% / 10.3% | 51.7% / 19.0% |
+| Who&When Algorithm-Generated | 50.8% / 21.4% | unchanged |
+| Synthetic holdout | 100% | 100% |
+
+The judge's answers were reused from the cache, so its prompts list the old rule candidates. The first-write baseline (74% on test) still beats the rules at top-1.

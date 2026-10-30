@@ -2,15 +2,15 @@
   "tracedown": {
     "cases": 499,
     "with_step": 383,
-    "localization@1": 0.65,
-    "localization@3": 0.815,
-    "category_agreement@1": 0.01,
+    "localization@1": 0.676,
+    "localization@3": 0.807,
+    "category_agreement@1": 0.006,
     "detection": 1.0,
     "per_label": {
       "called_wrong_tool": {
         "n": 143,
         "category_agreement": 0.007,
-        "localized": 116
+        "localized": 119
       },
       "goal_partially_completed": {
         "n": 116,
@@ -19,19 +19,20 @@
       },
       "missing_output": {
         "n": 28,
-        "category_agreement": 0.143,
+        "category_agreement": 0.071,
         "localized": 0
       },
       "used_wrong_tool_argument": {
         "n": 212,
         "category_agreement": 0.0,
-        "localized": 133
+        "localized": 140
       }
     },
     "top_categories": {
-      "unverified_action": 387,
-      "hallucination": 104,
+      "unverified_action": 404,
+      "hallucination": 85,
       "loop": 7,
+      "tool_failure": 2,
       "wrong_tool": 1
     }
   },
@@ -175,7 +176,7 @@
     "cases": 499,
     "with_step": 383,
     "localization@1": 0.632,
-    "localization@3": 0.815,
+    "localization@3": 0.807,
     "category_agreement@1": 0.447,
     "detection": 1.0,
     "per_label": {
