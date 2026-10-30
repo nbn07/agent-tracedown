@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import urllib.error
 import urllib.request
 from typing import Any, Callable, Dict, List, Optional
 
@@ -97,8 +98,11 @@ def parse(answer: str) -> Optional[Dict[str, Any]]:
 def _post(url: str, headers: Dict[str, str], body: Dict[str, Any], timeout: float = 60) -> Dict[str, Any]:
     req = urllib.request.Request(url, data=json.dumps(body).encode(), method="POST",
                                  headers={"Content-Type": "application/json", **headers})
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.loads(r.read())
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read())
+    except urllib.error.HTTPError as e:  # keep the provider's explanation
+        raise RuntimeError(f"{url}: HTTP {e.code}: {e.read()[:500].decode(errors='replace')}") from None
 
 
 def openai_judge(model: str, api_key: Optional[str] = None, base_url: Optional[str] = None) -> JudgeFn:
@@ -115,11 +119,19 @@ def openai_judge(model: str, api_key: Optional[str] = None, base_url: Optional[s
 def anthropic_judge(model: str, api_key: Optional[str] = None) -> JudgeFn:
     key = api_key or os.environ.get("ANTHROPIC_API_KEY", "")
 
+    # Newer models think before answering by default, and thinking counts against
+    # max_tokens: a small budget returns no text at all. Leave room for both.
+    body = {"model": model, "max_tokens": int(os.environ.get("TDN_JUDGE_MAX_TOKENS", "4000")), "temperature": 0}
+
     def call(prompt: str) -> str:
-        r = _post("https://api.anthropic.com/v1/messages",
-                  {"x-api-key": key, "anthropic-version": "2023-06-01"},
-                  {"model": model, "max_tokens": 400, "temperature": 0,
-                   "messages": [{"role": "user", "content": prompt}]})
+        req = dict(body, messages=[{"role": "user", "content": prompt}])
+        try:
+            r = _post("https://api.anthropic.com/v1/messages", {"x-api-key": key, "anthropic-version": "2023-06-01"}, req)
+        except RuntimeError as e:
+            if "temperature" not in str(e) or "temperature" not in req:
+                raise
+            body.pop("temperature", None)  # newer models fix their own sampling settings
+            return call(prompt)
         return "".join(b.get("text", "") for b in r.get("content", []))
     return call
 

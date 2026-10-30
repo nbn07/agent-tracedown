@@ -24,7 +24,18 @@ Held-out test split, 499 failed runs (383 with a single cause step), rules only:
 | Baseline: last LLM turn | 21% | 21% | 42% |
 | Baseline: first tool error | 13% | 13% | 0% |
 
-What this says: without a model, Tracedown has the right step in its top three 82% of the time, but its first guess is worse than "blame the first state-changing call", and it almost never names the *kind* of mistake. These failures are semantic (the right action with the wrong order or item), which rules cannot see. The LLM judge (`--judge`) exists for that; its numbers will be added once it has been run on test.
+What this says: without a model, Tracedown has the right step in its top three 82% of the time, but its first guess is worse than "blame the first state-changing call", and it almost never names the *kind* of mistake. These failures are semantic (the right action with the wrong order or item), which rules cannot see.
+
+**With the LLM judge** (Claude Haiku 5.5, one run on test after tuning on dev; details in [LABELING.md](LABELING.md)):
+
+| System | loc@1 | loc@3 | Category agrees |
+|---|---|---|---|
+| Tracedown + judge | 63% | 82% | **45%** |
+| Tracedown, rules only | 65% | 82% | 1% |
+| Baseline: first write call | 74% | 74% | 29% |
+| Baseline: last LLM turn | 21% | 21% | 42% (always the same answer) |
+
+The judge names the right kind of mistake for about half of wrong actions and wrong details, which rules almost never do. It does not find the step better: on its own it puts the right step first in 45% of test runs. The judge's 771 answers (dev and test) are in `realworld/judge-answers-haiku-5-5.jsonl`; copy that file to `realworld/data/judge-cache-anthropic_claude-haiku-5-5.jsonl` to recompute the scores without any API calls.
 
 **Human check.** `python realworld/label_sheet.py --split test --n 50` writes a sheet and readable transcripts to `realworld/labeling/`. Fill in the `human_*` columns, then `--score realworld/labeling/sheet.csv` reports how often the mechanical label is right and how Tracedown does against human labels.
 

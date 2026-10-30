@@ -34,6 +34,36 @@ def _response_text(resp: Any) -> Optional[str]:
     return "".join(parts) or None
 
 
+def _generation_text(output: Any) -> Any:
+    """Chat-completions style output (LiteLLM and other non-OpenAI models) is a list of
+    message dicts carrying provider extras such as signed thinking blocks. Keep what the
+    model said and which tools it asked for."""
+    if not isinstance(output, list):
+        return output
+    parts = []
+    for m in output:
+        if not isinstance(m, dict):
+            parts.append(str(m))
+            continue
+        content = m.get("content")
+        if isinstance(content, list):
+            content = "".join(c.get("text", "") for c in content if isinstance(c, dict))
+        if content:
+            parts.append(content)
+        for call in m.get("tool_calls") or []:
+            fn = call.get("function") or {} if isinstance(call, dict) else {}
+            if fn.get("name"):
+                parts.append(f"[calls {fn['name']}({fn.get('arguments') or ''})]")
+    return "\n".join(parts) if parts else None
+
+
+def _last_user_text(messages: Any) -> Optional[str]:
+    for m in reversed(messages if isinstance(messages, list) else []):
+        if isinstance(m, dict) and m.get("role") == "user" and isinstance(m.get("content"), str):
+            return m["content"]
+    return None
+
+
 class TracedownProcessor(_Base):  # type: ignore[misc,valid-type]
     def __init__(self) -> None:
         self._lock = threading.RLock()
@@ -91,7 +121,7 @@ class TracedownProcessor(_Base):  # type: ignore[misc,valid-type]
             error = f"{err.get('message')}: {err.get('data')}" if isinstance(err, dict) else (str(err) if err else None)
             if kind_name == "GenerationSpanData":
                 usage = d.usage or {}
-                text = to_jsonable(d.output)
+                text = _generation_text(to_jsonable(d.output))
                 t.spans[span.span_id].name = f"chat {d.model or 'model'}"
                 t.set(span.span_id, **{"gen_ai.request.model": d.model, "gen_ai.provider.name": "openai"})
                 self._input(t, span.span_id, d.input)
@@ -133,7 +163,13 @@ class TracedownProcessor(_Base):  # type: ignore[misc,valid-type]
     def _input(t: ManualTrace, key: str, value: Any) -> None:
         if value is not None:
             from ..tracer import _put_blob
-            t.spans[key].input_digest = _put_blob(t.state, to_jsonable(value))
+            value = to_jsonable(value)
+            t.spans[key].input_digest = _put_blob(t.state, value)
+            # the SDK trace has no input of its own: use the customer's first message
+            if t.root.input_digest is None and t.spans[key].kind == "llm":
+                first = _last_user_text(value)
+                if first:
+                    t.root.input_digest = _put_blob(t.state, first)
 
     def shutdown(self) -> None:
         with self._lock:

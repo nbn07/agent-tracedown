@@ -76,6 +76,28 @@ Tried and **not** shipped, because the dev data showed no signal:
 
 The synthetic benchmark (TDN-RCA-Bench holdout) stayed at 100% after these changes. E4 initially broke it (a 500 error treated as a refusal) and was fixed by the outage/refusal split.
 
+## LLM judge run (Claude Haiku 5.5), 2026-10-30
+
+Changes made on dev before the single test run:
+
+- **J1, infrastructure.** Claude Haiku 5.5 rejects `temperature` and thinks before answering, and thinking counts against `max_tokens`. With the original 400-token budget, 273 of 284 dev answers came back empty. The judge now drops `temperature` when a model rejects it and allows 4,000 tokens (`TDN_JUDGE_MAX_TOKENS`). The empty-answer run was discarded.
+- **E9, engine.** When the judge names a model turn where a bad plan was proposed (category `wrong_tool`, `bad_llm_output` or `policy_violation`) and a state-changing call follows, the finding is placed on that call, with "plan first proposed at step N" as evidence. On dev the judge named the earlier reasoning turn in 30 of the 43 cases where it disagreed with a correct first-write location. Dev: localization@1 64% → 71%, category agreement 56%.
+
+The judge is asked only when the best rule finding scores below 0.8: 284 of 298 dev runs and 487 of 499 test runs.
+
+Test split, single run (`results-test-judge-haiku-5-5.json`):
+
+| System | loc@1 | loc@3 | Category agrees |
+|---|---|---|---|
+| Tracedown, rules only | 65% | 82% | 1% |
+| Tracedown + judge (Claude Haiku 5.5) | 63% | 82% | 45% |
+| Baseline: first write call | 74% | 74% | 29% |
+| Baseline: last LLM turn | 21% | 21% | 42% |
+
+- Category agreement by label with the judge: wrong action 53%, right action with wrong details 54%, stopped short 27%, bad final answer 7%. The last-LLM-turn baseline's 42% comes from always answering `bad_llm_output`, which matches the most common label and nothing else.
+- The judge alone puts the right step first in 45% of test runs (60% on dev). Its location adds nothing over the rules; its value is naming the kind of mistake.
+- Dev to test drop: the judge reads GPT-4o transcripts better than Claude 3.5 Sonnet transcripts (dev 60% vs test 45% judge-alone localization). No further changes were made after the test run.
+
 ## Live harnesses (added after the test run; not part of the reported scores)
 
 `realworld/live/` runs real open-source agents with a model of your choice and writes case files that `score.py --file` reads. Live files also hold the passing runs; only failures are scored. Labels:

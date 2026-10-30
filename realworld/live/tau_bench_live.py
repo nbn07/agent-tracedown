@@ -34,6 +34,7 @@ def main() -> None:
     ap.add_argument("--user-model", default=None, help="simulated customer model (default: same as --model)")
     ap.add_argument("--tasks", default="0-9", help="task index range, e.g. 0-19")
     ap.add_argument("--trials", type=int, default=1)
+    ap.add_argument("--concurrency", type=int, default=4, help="tasks run in parallel")
     ap.add_argument("--dry-run", action="store_true", help="print the τ-bench command and exit")
     ap.add_argument("--results", help="skip running; convert an existing τ-bench results JSON")
     a = ap.parse_args()
@@ -43,17 +44,22 @@ def main() -> None:
     if a.results:
         path = a.results
     else:
-        cmd = [sys.executable, "run.py", "--agent-strategy", "tool-calling", "--env", a.env,
+        cmd = [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "_tau_run.py"), "--agent-strategy", "tool-calling", "--env", a.env,
                "--model", a.model, "--model-provider", a.provider,
                "--user-model", a.user_model or a.model, "--user-model-provider", a.provider,
                "--user-strategy", "llm", "--start-index", str(start), "--end-index", str(end + 1),
-               "--num-trials", str(a.trials), "--log-dir", out_dir]
+               "--num-trials", str(a.trials), "--max-concurrency", str(a.concurrency), "--log-dir", out_dir]
         print("running:", " ".join(cmd), f"(in {a.tau_bench})")
         if a.dry_run:
             return
         subprocess.run(cmd, cwd=a.tau_bench, check=True)
         path = max(glob.glob(os.path.join(out_dir, "*.json")), key=os.path.getmtime)
     records = json.load(open(path))
+    # runs that died on an API error never reached the customer: they are not agent failures
+    broken = [r for r in records if (r.get("info") or {}).get("error")]
+    if broken:
+        print(f"skipping {len(broken)} runs that ended in an API error, e.g. {broken[0]['info']['error'][:120]}")
+    records = [r for r in records if not (r.get("info") or {}).get("error")]
     name = a.model.replace("/", "_")
     cases = convert_records(records, a.env, a.model, f"live-{name}")
     for c in cases:

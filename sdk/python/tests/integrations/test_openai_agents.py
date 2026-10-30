@@ -43,3 +43,23 @@ def test_agents_sdk_trace_maps_to_abx_run():
     root = next(s for s in spans if s["parent_span_id"] is None)
     assert root["attributes"]["gen_ai.agent.name"] == "Refund workflow"
     assert [t["name"] for t in root["attributes"]["tdn.tools.available"]] == ["lookup_order"]
+
+
+def test_chat_completions_output_keeps_text_and_tool_calls():
+    """LiteLLM models report chat-completions messages with provider extras."""
+    mem = tdn.MemoryExporter()
+    tdn.init(project="t", exporter=mem)
+    proc = tdn_oa.instrument(replace=True)
+    with trace("Support"):
+        with agent_span(name="Triage", tools=[]):
+            with generation_span(model="anthropic/claude", input=[{"role": "user", "content": "where is my bag?"}]) as g:
+                g.span_data.output = [{"role": "assistant", "content": None,
+                                       "provider_specific_fields": {"thinking_blocks": [{"signature": "x" * 500}]},
+                                       "tool_calls": [{"id": "c1", "type": "function",
+                                                       "function": {"name": "faq_lookup", "arguments": "{\"q\": \"bag\"}"}}]}]
+    spans = mem.trace(proc.trace_ids[0])
+    gen = next(s for s in spans if s["kind"] == "llm")
+    out = json.loads(mem.blobs[gen["output_digest"]])
+    assert out == {"text": '[calls faq_lookup({"q": "bag"})]'}
+    root = next(s for s in spans if s["parent_span_id"] is None)
+    assert json.loads(mem.blobs[root["input_digest"]]) == "where is my bag?"

@@ -57,6 +57,33 @@ QUESTIONS: List[Dict[str, str]] = [
              "GROUP BY c.CustomerId ORDER BY SUM(i.Total) DESC LIMIT 1"},
     {"id": "avg-track-sec", "q": "What is the average track length in seconds, rounded to the nearest whole second?",
      "gold": "SELECT CAST(ROUND(AVG(Milliseconds) / 1000.0) AS INTEGER) FROM Track"},
+    # harder: several joins, anti-joins, NULLs, self-joins, date filters (added after the first
+    # live run, where Claude Haiku 5.5 answered all twelve questions above correctly)
+    {"id": "genre-revenue", "q": "Which genre has brought in the most money from track sales?",
+     "gold": "SELECT g.Name FROM InvoiceLine il JOIN Track t ON t.TrackId = il.TrackId JOIN Genre g ON g.GenreId = t.GenreId "
+             "GROUP BY g.GenreId ORDER BY SUM(il.UnitPrice * il.Quantity) DESC LIMIT 1"},
+    {"id": "no-jazz", "q": "How many customers have never bought a Jazz track?",
+     "gold": "SELECT COUNT(*) FROM Customer WHERE CustomerId NOT IN (SELECT i.CustomerId FROM Invoice i JOIN InvoiceLine il "
+             "ON il.InvoiceId = i.InvoiceId JOIN Track t ON t.TrackId = il.TrackId JOIN Genre g ON g.GenreId = t.GenreId "
+             "WHERE g.Name = 'Jazz')"},
+    {"id": "no-composer", "q": "What percentage of tracks have no composer listed? Round to one decimal place.",
+     "gold": "SELECT ROUND(100.0 * SUM(Composer IS NULL) / COUNT(*), 1) FROM Track"},
+    {"id": "top-manager", "q": "Which employee (first and last name) has the most people reporting directly to them?",
+     "gold": "SELECT m.FirstName || ' ' || m.LastName FROM Employee e JOIN Employee m ON e.ReportsTo = m.EmployeeId "
+             "GROUP BY m.EmployeeId ORDER BY COUNT(*) DESC LIMIT 1"},
+    {"id": "long-albums", "q": "How many albums have at least one track longer than 10 minutes?",
+     "gold": "SELECT COUNT(DISTINCT AlbumId) FROM Track WHERE Milliseconds > 600000"},
+    {"id": "artist-sold", "q": "Which artist's tracks appear on the most invoice lines?",
+     "gold": "SELECT ar.Name FROM InvoiceLine il JOIN Track t ON t.TrackId = il.TrackId JOIN Album al ON al.AlbumId = t.AlbumId "
+             "JOIN Artist ar ON ar.ArtistId = al.ArtistId GROUP BY ar.ArtistId ORDER BY COUNT(*) DESC LIMIT 1"},
+    {"id": "best-month-2023", "q": "In 2023, which month had the highest invoice revenue? Answer with the month number (1-12).",
+     "gold": "SELECT CAST(strftime('%m', InvoiceDate) AS INTEGER) FROM Invoice WHERE strftime('%Y', InvoiceDate) = '2023' "
+             "GROUP BY 1 ORDER BY SUM(Total) DESC LIMIT 1"},
+    {"id": "idle-2024", "q": "How many customers had no invoices at all in 2024?",
+     "gold": "SELECT COUNT(*) FROM Customer WHERE CustomerId NOT IN (SELECT CustomerId FROM Invoice "
+             "WHERE strftime('%Y', InvoiceDate) = '2024')"},
+    {"id": "avg-invoice-brazil", "q": "What is the average invoice total for invoices billed to Brazil, to two decimals?",
+     "gold": "SELECT ROUND(AVG(Total), 2) FROM Invoice WHERE BillingCountry = 'Brazil'"},
 ]
 
 SYSTEM = ("You are an agent that answers questions about a SQLite music-store database. First look at the tables, "
@@ -95,11 +122,13 @@ def norm(s: str) -> str:
 
 
 def contains(text: str, gold: Any) -> bool:
-    t = norm(text)
-    cands = {norm(gold)}
-    if isinstance(gold, float):
-        cands |= {norm(f"{gold:.2f}"), norm(f"{gold:.1f}") if gold * 10 == int(gold * 10) else norm(f"{gold:.2f}")}
-    return any(c and c in t for c in cands)
+    """Is the gold value in the answer? Numbers must match as whole numbers ("4" is not in "24")."""
+    if isinstance(gold, (int, float)):
+        t = str(text or "").replace(",", "")
+        forms = {str(gold), f"{gold:.2f}", f"{gold:.1f}"} if isinstance(gold, float) else {str(gold)}
+        forms |= {f.rstrip("0").rstrip(".") for f in forms if "." in f}
+        return any(re.search(rf"(?<![\d.]){re.escape(f)}(?![\d]|\.\d)", t) for f in forms)
+    return norm(gold) in norm(text)
 
 
 # ----------------------------------------------------------------------------- scripted model (--fake)
@@ -118,6 +147,9 @@ FAKE_SQL = {  # deliberately wrong for some questions: the bugs a real model mak
     "top-customer": "SELECT c.FirstName || ' ' || c.LastName FROM Customer c JOIN Invoice i ON i.CustomerId = c.CustomerId GROUP BY c.CustomerId ORDER BY SUM(i.Total) DESC LIMIT 1",
     "avg-track-sec": "SELECT AVG(Milliseconds) FROM Track",  # milliseconds, not seconds
 }
+
+
+GOLD = {q["id"]: q["gold"] for q in QUESTIONS}
 
 
 def make_fake_model():
@@ -142,10 +174,10 @@ def make_fake_model():
             if n == 0:
                 msg = AIMessage(content="", tool_calls=[{"name": "list_tables", "args": {}, "id": f"c{n}"}])
             elif n == 1:
-                table = re.search(r"FROM (\w+)", FAKE_SQL[qid]).group(1)
+                table = re.search(r"FROM (\w+)", FAKE_SQL.get(qid, GOLD[qid])).group(1)
                 msg = AIMessage(content="", tool_calls=[{"name": "describe_table", "args": {"table": table}, "id": f"c{n}"}])
             elif n == 2:
-                msg = AIMessage(content="", tool_calls=[{"name": "run_query", "args": {"sql": FAKE_SQL[qid]}, "id": f"c{n}"}])
+                msg = AIMessage(content="", tool_calls=[{"name": "run_query", "args": {"sql": FAKE_SQL.get(qid, GOLD[qid])}, "id": f"c{n}"}])
             else:
                 rows = json.loads(tools_done[-1].content).get("rows") or [[None]]
                 msg = AIMessage(content=f"The answer is {rows[0][0]}.")
@@ -161,7 +193,7 @@ def make_model(spec: str):
         return ChatOpenAI(model=model, temperature=0)
     if provider == "anthropic":
         from langchain_anthropic import ChatAnthropic
-        return ChatAnthropic(model=model, temperature=0)
+        return ChatAnthropic(model=model, max_tokens=8000)  # newer models reject temperature and think first
     raise SystemExit("use --model openai:<model> or anthropic:<model>")
 
 

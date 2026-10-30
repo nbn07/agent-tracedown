@@ -364,6 +364,17 @@ def test_judge_adds_semantic_finding_when_rules_are_weak(mem):
     assert "refunded #1" in " ".join(top["evidence"])
 
 
+def test_judge_verdict_on_a_plan_is_anchored_on_the_action_that_carried_it_out(mem):
+    tid = _failed_refund_run(mem)
+    plan = '{"step": 2, "category": "%s", "confidence": 0.8, "explanation": "chose order #1"}'
+    top = analyze(mem.trace(tid), mem.blobs, judge=lambda p: plan % "bad_llm_output")["root_cause"]
+    assert top["detector"] == "llm_judge" and top["step"] == 3
+    assert top["evidence"][0] == "plan first proposed at step 2; carried out at step 3"
+    # a verdict about what the agent *said* stays on the reply
+    top = analyze(mem.trace(tid), mem.blobs, judge=lambda p: plan % "hallucination")["root_cause"]
+    assert top["step"] == 2
+
+
 def test_judge_not_called_when_rules_have_direct_evidence(mem):
     try:
         demo.calendar_agent()

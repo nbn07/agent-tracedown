@@ -238,11 +238,29 @@ def _ask_judge(run: RunView, ranked: List[Finding], score, judge: Any, n: int) -
     span = next((s for s in run.spans if run.step(s) == verdict["step"]), None)
     if span is None:
         return None
+    # The judge often names the reply where a bad plan was first proposed. If that plan was
+    # then carried out, the action that made it real ranks first (it is what changed the
+    # world) and the judge's reasoning travels with it: "decided at step 15, done at step 17".
+    origin = None
+    if span["kind"] == "llm" and verdict["category"] in _ACTION_CATEGORIES:
+        from .detectors import has_side_effects
+        declared = {t.get("name"): t for t in (run.root["attributes"].get("tdn.tools.available") or [])
+                    if isinstance(t, dict)}
+        later = [s for s in run.spans if s["kind"] == "tool" and run.step(s) > verdict["step"]
+                 and has_side_effects(s, declared)]
+        if later:
+            origin, span = verdict["step"], min(later, key=run.step)
+            verdict = dict(verdict, step=run.step(span))
     f = Finding("judged" if verdict["category"] == "other" else verdict["category"],
                 verdict.get("explanation", "")[:300] or "LLM judge verdict", span["span_id"], verdict["step"],
                 min(0.9, 0.6 + 0.3 * verdict["confidence"]), "llm_judge",
                 [f"LLM judge: {verdict.get('explanation', '')[:300]}",
                  f"judge confidence {verdict['confidence']:.2f}; rule-based top candidate was "
                  + (f"step {ranked[0].step} ({ranked[0].category})" if ranked else "none")])
+    if origin is not None:
+        f.evidence.insert(0, f"plan first proposed at step {origin}; carried out at step {verdict['step']}")
     f.id = f"f{n + 1}"
     return f
+
+
+_ACTION_CATEGORIES = {"wrong_tool", "bad_llm_output", "policy_violation"}
