@@ -1,0 +1,209 @@
+{
+  "tracedown": {
+    "cases": 25,
+    "with_step": 22,
+    "localization@1": 0.636,
+    "localization@3": 0.864,
+    "category_agreement@1": 0.0,
+    "detection": 1.0,
+    "per_label": {
+      "called_wrong_tool": {
+        "n": 13,
+        "category_agreement": 0.0,
+        "localized": 10
+      },
+      "goal_partially_completed": {
+        "n": 3,
+        "category_agreement": 0.0,
+        "localized": 0
+      },
+      "missing_output": {
+        "n": 2,
+        "category_agreement": 0.0,
+        "localized": 0
+      },
+      "used_wrong_tool_argument": {
+        "n": 7,
+        "category_agreement": 0.0,
+        "localized": 4
+      }
+    },
+    "top_categories": {
+      "unverified_action": 20,
+      "hallucination": 5
+    }
+  },
+  "baseline: first tool error": {
+    "cases": 25,
+    "with_step": 22,
+    "localization@1": 0.091,
+    "localization@3": 0.091,
+    "category_agreement@1": 0.0,
+    "detection": 0.16,
+    "per_label": {
+      "called_wrong_tool": {
+        "n": 13,
+        "category_agreement": 0.0,
+        "localized": 2
+      },
+      "goal_partially_completed": {
+        "n": 3,
+        "category_agreement": 0.0,
+        "localized": 0
+      },
+      "missing_output": {
+        "n": 2,
+        "category_agreement": 0.0,
+        "localized": 0
+      },
+      "used_wrong_tool_argument": {
+        "n": 7,
+        "category_agreement": 0.0,
+        "localized": 0
+      }
+    },
+    "top_categories": {
+      "reported_failure": 21,
+      "tool_failure": 4
+    }
+  },
+  "baseline: last LLM turn": {
+    "cases": 25,
+    "with_step": 22,
+    "localization@1": 0.227,
+    "localization@3": 0.227,
+    "category_agreement@1": 0.28,
+    "detection": 1.0,
+    "per_label": {
+      "called_wrong_tool": {
+        "n": 13,
+        "category_agreement": 0.0,
+        "localized": 3
+      },
+      "goal_partially_completed": {
+        "n": 3,
+        "category_agreement": 0.0,
+        "localized": 0
+      },
+      "missing_output": {
+        "n": 2,
+        "category_agreement": 0.0,
+        "localized": 2
+      },
+      "used_wrong_tool_argument": {
+        "n": 7,
+        "category_agreement": 1.0,
+        "localized": 0
+      }
+    },
+    "top_categories": {
+      "bad_llm_output": 25
+    }
+  },
+  "baseline: last write call": {
+    "cases": 25,
+    "with_step": 22,
+    "localization@1": 0.682,
+    "localization@3": 0.682,
+    "category_agreement@1": 0.52,
+    "detection": 0.92,
+    "per_label": {
+      "called_wrong_tool": {
+        "n": 13,
+        "category_agreement": 1.0,
+        "localized": 9
+      },
+      "goal_partially_completed": {
+        "n": 3,
+        "category_agreement": 0.0,
+        "localized": 0
+      },
+      "missing_output": {
+        "n": 2,
+        "category_agreement": 0.0,
+        "localized": 0
+      },
+      "used_wrong_tool_argument": {
+        "n": 7,
+        "category_agreement": 0.0,
+        "localized": 6
+      }
+    },
+    "top_categories": {
+      "wrong_tool": 23,
+      "null": 2
+    }
+  },
+  "baseline: first write call": {
+    "cases": 25,
+    "with_step": 22,
+    "localization@1": 0.727,
+    "localization@3": 0.727,
+    "category_agreement@1": 0.52,
+    "detection": 0.92,
+    "per_label": {
+      "called_wrong_tool": {
+        "n": 13,
+        "category_agreement": 1.0,
+        "localized": 11
+      },
+      "goal_partially_completed": {
+        "n": 3,
+        "category_agreement": 0.0,
+        "localized": 0
+      },
+      "missing_output": {
+        "n": 2,
+        "category_agreement": 0.0,
+        "localized": 0
+      },
+      "used_wrong_tool_argument": {
+        "n": 7,
+        "category_agreement": 0.0,
+        "localized": 5
+      }
+    },
+    "top_categories": {
+      "wrong_tool": 23,
+      "null": 2
+    }
+  },
+  "tracedown + judge (anthropic:claude-haiku-5-5)": {
+    "cases": 25,
+    "with_step": 22,
+    "localization@1": 0.545,
+    "localization@3": 0.773,
+    "category_agreement@1": 0.4,
+    "detection": 1.0,
+    "per_label": {
+      "called_wrong_tool": {
+        "n": 13,
+        "category_agreement": 0.385,
+        "localized": 8
+      },
+      "goal_partially_completed": {
+        "n": 3,
+        "category_agreement": 0.0,
+        "localized": 0
+      },
+      "missing_output": {
+        "n": 2,
+        "category_agreement": 0.5,
+        "localized": 0
+      },
+      "used_wrong_tool_argument": {
+        "n": 7,
+        "category_agreement": 0.571,
+        "localized": 4
+      }
+    },
+    "top_categories": {
+      "hallucination": 7,
+      "bad_llm_output": 6,
+      "wrong_tool": 6,
+      "unverified_action": 4,
+      "incomplete_task": 1,
+      "policy_violation": 1
+    }
+  }
+}

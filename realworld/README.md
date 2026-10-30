@@ -55,6 +55,18 @@ python realworld/live/tau_bench_live.py --tau-bench ../tau-bench --env retail --
 python realworld/score.py --file realworld/data/live-oa-cs-gpt-4.1-mini.jsonl
 ```
 
+**First live run (2026-10-30, Claude Haiku 5.5 as the agent and, for τ-bench, as the simulated customer):**
+
+| Harness | Runs | Failed | Tracedown loc@1 / loc@3 | + judge loc@1 / category | First-write baseline |
+|---|---|---|---|---|---|
+| τ-bench live (40 retail + 25 airline tasks) | 65 | 25 | 64% / 86% | 55% / 40% | 73% (category 52%) |
+| OpenAI Agents SDK customer service (12 conversations × 3) | 36 | 3 | 100% / 100% | 67% / 0% | n/a (no writes) |
+| LangGraph SQL agent (21 questions × 2) | 42 | 0 | n/a | n/a | n/a |
+
+- τ-bench live agrees with the historical test split: the rules find the step's neighbourhood (86% top-3) but the first-write prior wins top-1, and on these 25 failures the judge did not help.
+- All three customer-service failures are the same: "Which rows are the exit rows?" The example's `faq_lookup_tool` matches keywords and has no answer for that wording, so the agent correctly says it does not know. The mechanical label blames the final reply; the real cause is the tool. Tracedown's "unsupported claim" on the reply matches the label but not the truth.
+- The SQL agent answered every question correctly, including nine harder ones added after the first run. A stronger test needs harder or ambiguous questions, or a weaker model.
+
 Add `--endpoint http://localhost:8000` to also send every run to a Tracedown server and look at the failures in the UI. Add `--fake` to check a harness without a key: it swaps in a scripted model with deliberate bugs. Fake-model scores test the plumbing only.
 
 Case files go to `realworld/data/` (gitignored). Each line is one run: `success`, `label` (for failures) and the full trace `bundle`.

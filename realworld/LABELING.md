@@ -113,3 +113,5 @@ Test split, single run (`results-test-judge-haiku-5-5.json`):
 Each harness has `--fake`, a scripted model with deliberate bugs, so the plumbing can be checked without a key. Fake-model scores test the harness, not Tracedown, and are not reported.
 
 Building the harnesses found two bugs in the OpenAI Agents SDK adapter, both fixed: tool arguments were not recorded (the SDK fills them in after the span starts), and handoff targets showed as `None` (only known when the handoff resolves). The τ-bench numbers above do not use that adapter and are unaffected.
+
+First live results (Claude Haiku 5.5) are in `README.md`. Runs that ended in an API error (rate limits on the first attempt) were discarded and rerun with retries; they are never counted as agent failures.
