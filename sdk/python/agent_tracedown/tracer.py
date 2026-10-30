@@ -628,8 +628,10 @@ class ManualTrace:
             return span
 
     def declare_tools(self, tools: List[Dict[str, Any]]) -> None:
-        self.root.set("tdn.tools.available", [{"name": t.get("name"), "description": (t.get("description") or "")[:500],
-                                               "schema": t.get("schema")} for t in tools if t.get("name")])
+        self.root.set("tdn.tools.available", [
+            {"name": t.get("name"), "description": (t.get("description") or "")[:500], "schema": t.get("schema"),
+             **({"side_effects": bool(t["side_effects"])} if "side_effects" in t else {})}
+            for t in tools if t.get("name")])
 
     def finish(self, output: Any = None, error: Optional[str] = None) -> str:
         with self._lock:

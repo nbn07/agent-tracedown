@@ -39,6 +39,10 @@ The judge names the right kind of mistake for about half of wrong actions and wr
 
 **Human check.** `python realworld/label_sheet.py --split test --n 50` writes a sheet and readable transcripts to `realworld/labeling/`. Fill in the `human_*` columns, then `--score realworld/labeling/sheet.csv` reports how often the mechanical label is right and how Tracedown does against human labels.
 
+## 1b. Who&When (public failure-attribution benchmark)
+
+184 multi-agent failure logs with labelled culprit agent and step. Rules only, exact match: step accuracy 21% (algorithm-generated) and 10% (hand-crafted), in the range of the paper's GPT-4o judges but below a "first failed output" baseline (23% / 16%). Details and caveats: [whowhen/README.md](whowhen/README.md).
+
 ## 2. Live harnesses around real agent projects (your model, your key)
 
 | Harness | Project | What it checks |

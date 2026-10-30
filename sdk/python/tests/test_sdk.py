@@ -154,3 +154,15 @@ def test_openai_plugin_wraps_client(mem):
     llm = next(s for s in mem.spans if s["kind"] == "llm")
     assert llm["attributes"]["gen_ai.provider.name"] == "openai"
     assert llm["attributes"]["gen_ai.request.model"] == "gpt-x"
+
+
+def test_declare_tools_keeps_side_effects_flag():
+    """A tool declared read-only must stay read-only for root-cause analysis."""
+    mem = tdn.MemoryExporter()
+    tdn.init(project="t", exporter=mem)
+    t = tdn.ManualTrace("Browser")
+    t.declare_tools([{"name": "web_browse", "side_effects": False}, {"name": "book_flight"}])
+    t.finish()
+    root = next(s for s in mem.spans if s["parent_span_id"] is None)
+    tools = {x["name"]: x for x in root["attributes"]["tdn.tools.available"]}
+    assert tools["web_browse"]["side_effects"] is False and "side_effects" not in tools["book_flight"]
