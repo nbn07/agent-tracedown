@@ -1,0 +1,212 @@
+{
+  "agent-tracedown": {
+    "cases": 100,
+    "category@1": 1.0,
+    "exact@1": 1.0,
+    "exact@3": 1.0,
+    "exact@1_with_distractor": 1.0,
+    "exact@1_without_distractor": 1.0,
+    "per_category": {
+      "bad_llm_output": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n": 10
+      },
+      "context_window": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n": 10
+      },
+      "hallucination": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n": 10
+      },
+      "loop": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n": 10
+      },
+      "memory_corruption": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n": 10
+      },
+      "planning_failure": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n": 10
+      },
+      "retrieval_failure": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n": 10
+      },
+      "stale_source": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n": 10
+      },
+      "tool_failure": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n": 10
+      },
+      "wrong_tool": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1": 1.0,
+        "n": 10
+      }
+    }
+  },
+  "baseline: first error": {
+    "cases": 100,
+    "category@1": 0.1,
+    "exact@1": 0.1,
+    "exact@3": 0.1,
+    "exact@1_with_distractor": 0.1,
+    "exact@1_without_distractor": 0.1,
+    "per_category": {
+      "bad_llm_output": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "n": 10
+      },
+      "context_window": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "n": 10
+      },
+      "hallucination": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "n": 10
+      },
+      "loop": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "n": 10
+      },
+      "memory_corruption": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "n": 10
+      },
+      "planning_failure": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "n": 10
+      },
+      "retrieval_failure": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "n": 10
+      },
+      "stale_source": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "n": 10
+      },
+      "tool_failure": {
+        "precision": 0.278,
+        "recall": 1.0,
+        "f1": 0.435,
+        "n": 10
+      },
+      "wrong_tool": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "n": 10
+      }
+    }
+  },
+  "baseline: last LLM call": {
+    "cases": 100,
+    "category@1": 0.1,
+    "exact@1": 0.1,
+    "exact@3": 0.1,
+    "exact@1_with_distractor": 0.1,
+    "exact@1_without_distractor": 0.1,
+    "per_category": {
+      "bad_llm_output": {
+        "precision": 0.111,
+        "recall": 1.0,
+        "f1": 0.2,
+        "n": 10
+      },
+      "context_window": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "n": 10
+      },
+      "hallucination": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "n": 10
+      },
+      "loop": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "n": 10
+      },
+      "memory_corruption": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "n": 10
+      },
+      "planning_failure": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "n": 10
+      },
+      "retrieval_failure": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "n": 10
+      },
+      "stale_source": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "n": 10
+      },
+      "tool_failure": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "n": 10
+      },
+      "wrong_tool": {
+        "precision": 0.0,
+        "recall": 0.0,
+        "f1": 0.0,
+        "n": 10
+      }
+    }
+  }
+}

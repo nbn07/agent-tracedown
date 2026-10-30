@@ -1,0 +1,337 @@
+"""Deterministic detectors. Each looks at one run and emits candidate findings.
+
+Detectors are cheap and run on every run. Confidence values are calibrated
+heuristics, not probabilities, until the RCA benchmark reports precision/recall.
+"""
+from __future__ import annotations
+
+import json
+import re
+from collections import Counter, defaultdict
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, List, Optional
+
+CATEGORY_LABELS = {
+    "tool_failure": "Tool failure",
+    "invalid_tool_args": "Invalid tool arguments",
+    "loop": "Agent loop",
+    "retrieval_failure": "Retrieval failure",
+    "stale_source": "Outdated retrieval source",
+    "context_window": "Context window exhausted",
+    "hallucination": "Unsupported claim (hallucination)",
+    "memory_corruption": "Memory corruption",
+    "planning_failure": "Planning failure",
+    "bad_llm_output": "Bad LLM output",
+    "unhandled_error": "Unhandled error",
+    "reported_failure": "Run marked failed",
+    "wrong_tool": "Wrong tool selected",
+}
+
+
+@dataclass
+class Finding:
+    category: str
+    title: str
+    span_id: str
+    step: int
+    confidence: float
+    detector: str
+    evidence: List[str] = field(default_factory=list)
+    symptom: bool = False          # where the failure surfaced, not necessarily why
+    caused_by: Optional[str] = None  # finding id of the upstream root cause
+    id: str = ""
+
+    def as_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id, "category": self.category, "label": CATEGORY_LABELS.get(self.category, self.category),
+            "title": self.title, "span_id": self.span_id, "step": self.step,
+            "confidence": round(self.confidence, 2), "detector": self.detector,
+            "evidence": self.evidence, "symptom": self.symptom, "caused_by": self.caused_by,
+        }
+
+
+@dataclass
+class RunView:
+    """A run with decoded payloads, the shape every detector receives."""
+    spans: List[Dict[str, Any]]
+    blobs: Dict[str, str]
+
+    def __post_init__(self) -> None:
+        self.spans = sorted(self.spans, key=lambda s: s["attributes"].get("tdn.step", 0))
+        self.by_id = {s["span_id"]: s for s in self.spans}
+        self.root = next((s for s in self.spans if not s["parent_span_id"]), self.spans[0])
+
+    def payload(self, digest: Optional[str]) -> Any:
+        if not digest or digest not in self.blobs:
+            return None
+        try:
+            return json.loads(self.blobs[digest])
+        except ValueError:
+            return self.blobs[digest]
+
+    def input(self, span) -> Any:
+        return self.payload(span.get("input_digest"))
+
+    def output(self, span) -> Any:
+        return self.payload(span.get("output_digest"))
+
+    def step(self, span) -> int:
+        return int(span["attributes"].get("tdn.step", 0))
+
+    def of_kind(self, kind: str) -> List[Dict[str, Any]]:
+        return [s for s in self.spans if s["kind"] == kind]
+
+
+Detector = Callable[[RunView], List[Finding]]
+DETECTORS: List[Detector] = []
+
+
+def detector(fn: Detector) -> Detector:
+    DETECTORS.append(fn)
+    return fn
+
+
+def text_of(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict) and isinstance(value.get("text"), str):
+        return value["text"]
+    return json.dumps(value, default=str)
+
+
+# ----------------------------------------------------------------------------- detectors
+
+@detector
+def tool_errors(run: RunView) -> List[Finding]:
+    out = []
+    for s in run.of_kind("tool"):
+        if s["status"]["code"] != "ERROR":
+            continue
+        a = s["attributes"]
+        tool = a.get("gen_ai.tool.name", s["name"])
+        invalid = a.get("tdn.tool.args_valid") is False
+        retry = next((t for t in run.of_kind("tool") if run.step(t) > run.step(s) and t["status"]["code"] != "ERROR"
+                      and t["attributes"].get("gen_ai.tool.name") == tool
+                      and t.get("input_digest") == s.get("input_digest")), None)
+        if retry is not None:
+            # Recovered: the same call succeeded later, so this error did not cause the outcome.
+            out.append(Finding("tool_failure", f"{tool}() failed once and succeeded on retry: {s['status']['message']}",
+                               s["span_id"], run.step(s), 0.3, "tool_errors",
+                               [f"step {run.step(retry)} repeated the call successfully"]))
+            continue
+        out.append(Finding(
+            category="invalid_tool_args" if invalid else "tool_failure",
+            title=f"{tool}() {'rejected its arguments' if invalid else 'failed'}: {s['status']['message']}",
+            span_id=s["span_id"], step=run.step(s), confidence=0.9, detector="tool_errors", symptom=True,
+            evidence=[f"step {run.step(s)} status ERROR: {s['status']['message']}",
+                      f"arguments: {json.dumps(run.input(s), default=str)[:200]}"],
+        ))
+    return out
+
+
+def _schema_errors(args: Any, schema: Optional[Dict[str, Any]]) -> Optional[List[str]]:
+    """Same subset as the SDK's validate_args: required keys, types, date-time format."""
+    if not isinstance(args, dict) or not schema:
+        return None
+    errs = [f"missing {k}" for k in schema.get("required", []) if k not in args]
+    props = schema.get("properties", {})
+    types = {"string": str, "integer": int, "number": (int, float), "boolean": bool, "object": dict, "array": list}
+    for k, v in args.items():
+        spec = props.get(k)
+        if spec is None:
+            if schema.get("additionalProperties") is False:
+                errs.append(f"unexpected {k}")
+            continue
+        if spec.get("type") in types and not isinstance(v, types[spec["type"]]):
+            errs.append(f"{k} type")
+        elif spec.get("format") == "date-time" and isinstance(v, str) and not re.match(r"^\d{4}-\d{2}-\d{2}T", v):
+            errs.append(f"{k} format")
+    return errs
+
+
+def _words(text: str) -> set:
+    return {w.lower().rstrip("s") for w in re.findall(r"[A-Za-z]{3,}", text or "")} - _COMMON
+
+
+_COMMON = set("the and for you your with this that from have please can want would like get make need "
+              "use using tool call function return returns given".split())
+
+
+@detector
+def wrong_tool(run: RunView) -> List[Finding]:
+    """The agent called tool X where tool Y fits.
+
+    Needs the tools offered to the model (``tdn.declare_tools`` / framework plugins
+    record ``tdn.tools.available``). Two signals:
+    1. the arguments fail X's schema but satisfy Y's (strong);
+    2. the run failed and the user's request matches Y's description far better than X's (weaker).
+    """
+    tools = run.root["attributes"].get("tdn.tools.available") or []
+    if len(tools) < 2:
+        return []
+    by_name = {t.get("name"): t for t in tools if t.get("name")}
+    request = _words(json.dumps(run.input(run.root), default=str))
+    failed = run.root["attributes"].get("tdn.run.outcome") == "failure" or run.root["status"]["code"] == "ERROR"
+    out = []
+    for s in run.of_kind("tool"):
+        name = s["attributes"].get("gen_ai.tool.name")
+        chosen = by_name.get(name)
+        if chosen is None:
+            continue
+        args = run.input(s)
+        errs = _schema_errors(args, chosen.get("schema"))
+        fits = [n for n, t in by_name.items() if n != name and _schema_errors(args, t.get("schema")) == []]
+        if errs and fits:
+            out.append(Finding("wrong_tool", f"Called {name}() but the arguments fit {fits[0]}()",
+                               s["span_id"], run.step(s), 0.75, "wrong_tool",
+                               [f"{name} schema rejects the arguments: {', '.join(errs)}",
+                                f"{fits[0]} schema accepts the same arguments",
+                                f"arguments: {json.dumps(args, default=str)[:160]}"]))
+            continue
+        if failed and request:
+            def overlap(t):
+                return len(request & _words(f"{t.get('name', '')} {t.get('description', '')}".replace("_", " ")))
+            mine = overlap(chosen)
+            best_name, best = max(((n, overlap(t)) for n, t in by_name.items() if n != name),
+                                  key=lambda x: x[1], default=(None, 0))
+            if best_name and best >= 2 and best >= 2 * max(mine, 1):
+                out.append(Finding("wrong_tool", f"Request matches {best_name}() better than the chosen {name}()",
+                                   s["span_id"], run.step(s), 0.55, "wrong_tool",
+                                   [f"request shares {best} terms with {best_name}'s description, {mine} with {name}'s"]))
+    return out
+
+
+@detector
+def loops(run: RunView) -> List[Finding]:
+    out = []
+    groups: Dict[tuple, List[Dict[str, Any]]] = defaultdict(list)
+    for s in run.of_kind("tool"):
+        groups[(s["attributes"].get("gen_ai.tool.name", s["name"]), s.get("input_digest"))].append(s)
+    for (tool, _), spans in groups.items():
+        if len(spans) >= 3:
+            steps = [run.step(s) for s in spans]
+            out.append(Finding(
+                category="loop", title=f"{tool}() called {len(spans)} times with identical arguments",
+                span_id=spans[0]["span_id"], step=steps[0], confidence=0.9, detector="loops",
+                evidence=[f"steps {steps} share one argument digest",
+                          f"arguments: {json.dumps(run.input(spans[0]), default=str)[:160]}"],
+            ))
+    budget = run.root["attributes"].get("tdn.step_budget")
+    if budget and len(run.spans) - 1 > int(budget):
+        out.append(Finding(
+            category="loop", title=f"Run used {len(run.spans) - 1} steps, over its budget of {budget}",
+            span_id=run.root["span_id"], step=0, confidence=0.8, detector="loops",
+            evidence=[f"tdn.step_budget={budget}"]))
+    return out
+
+
+@detector
+def retrieval_quality(run: RunView) -> List[Finding]:
+    out = []
+    for s in run.of_kind("retrieval"):
+        a = s["attributes"]
+        chunks = a.get("tdn.retrieval.chunks") or []
+        q = a.get("tdn.retrieval.query", "")
+        stale = [c for c in chunks if c.get("stale")]
+        if a.get("tdn.retrieval.count", len(chunks)) == 0:
+            out.append(Finding("retrieval_failure", f"Retrieval returned no chunks for {q!r}", s["span_id"],
+                               run.step(s), 0.75, "retrieval_quality", [f"query: {q!r}", "0 chunks"]))
+        elif stale:
+            srcs = ", ".join(f"{c.get('source') or c.get('id')} (v{c.get('version', '?')})" for c in stale)
+            out.append(Finding("stale_source", f"Retrieved an outdated source: {srcs}", s["span_id"],
+                               run.step(s), 0.8, "retrieval_quality",
+                               [f"query: {q!r}", f"{len(stale)} of {len(chunks)} chunks marked stale/superseded"]))
+        elif isinstance(a.get("tdn.retrieval.max_score"), (int, float)) and a["tdn.retrieval.max_score"] < 0.5:
+            out.append(Finding("retrieval_failure",
+                               f"Low-relevance retrieval for {q!r} (best score {a['tdn.retrieval.max_score']:.2f})",
+                               s["span_id"], run.step(s), 0.7, "retrieval_quality",
+                               [f"max score {a['tdn.retrieval.max_score']:.2f} < 0.50"]))
+    return out
+
+
+@detector
+def context_window(run: RunView) -> List[Finding]:
+    out = []
+    for s in run.of_kind("llm"):
+        u = s["attributes"].get("tdn.llm.context_utilization")
+        if isinstance(u, (int, float)) and u >= 0.95:
+            out.append(Finding("context_window", f"Prompt filled {u:.0%} of the model's context window",
+                               s["span_id"], run.step(s), 0.85, "context_window",
+                               [f"input tokens {s['attributes'].get('gen_ai.usage.input_tokens')} of "
+                                f"{s['attributes'].get('tdn.llm.context_limit')}"]))
+    return out
+
+
+@detector
+def memory_consistency(run: RunView) -> List[Finding]:
+    out, last_write = [], {}
+    for s in run.of_kind("memory"):
+        a = s["attributes"]
+        key = a.get("tdn.memory.key")
+        if a.get("tdn.memory.op") == "write":
+            last_write[key] = (a.get("tdn.memory.value_digest"), run.step(s))
+        elif a.get("tdn.memory.op") == "read" and key in last_write:
+            written, wstep = last_write[key]
+            if written != a.get("tdn.memory.value_digest"):
+                out.append(Finding("memory_corruption",
+                                   f"Memory key {key!r} read back a different value than step {wstep} wrote",
+                                   s["span_id"], run.step(s), 0.8, "memory_consistency",
+                                   [f"written {written[:19]}…", f"read {str(a.get('tdn.memory.value_digest'))[:19]}…"]))
+    return out
+
+
+@detector
+def planning(run: RunView) -> List[Finding]:
+    out = []
+    for s in run.of_kind("decision"):
+        a = s["attributes"]
+        if a.get("tdn.decision.precondition_ok") is False:
+            out.append(Finding("planning_failure",
+                               f"Chose {a.get('tdn.decision.chosen')!r} although its precondition failed",
+                               s["span_id"], run.step(s), 0.65, "planning",
+                               [f"options: {a.get('tdn.decision.options')}",
+                                f"rationale: {a.get('tdn.decision.rationale') or '(none)'}"]))
+    return out
+
+
+@detector
+def hallucination(run: RunView) -> List[Finding]:
+    """Claim-level check via the hallucination investigator (``tracedown_server.claims``).
+
+    One finding per run, placed on the LLM step where the first bad claim originated.
+    """
+    if run.output(run.root) is None:
+        return []
+    from ..claims import investigate
+    report = investigate(run)
+    bad = [c for c in report["claims"] if c["label"] in ("contradicted", "unsupported")]
+    if not bad or report["summary"]["evidence_units"] <= 1:
+        return []  # nothing to check against but the user's own message
+    first = min(bad, key=lambda c: (c["origin"] or {"step": 10 ** 9})["step"])
+    span_id = (first["origin"] or {}).get("span_id")
+    origin = run.by_id.get(span_id) if span_id else None
+    if origin is None:
+        llm = run.of_kind("llm")
+        origin = llm[-1] if llm else run.root
+    contradicted = any(c["label"] == "contradicted" for c in bad)
+    numeric = any("number" in c["rationale"] for c in bad)
+    ev = [f"{c['label']}: {c['text']!r} ({c['rationale']})" for c in bad[:3]]
+    return [Finding("hallucination",
+                    f"{len(bad)} of {report['summary']['claims']} answer claims not supported by any source",
+                    origin["span_id"], run.step(origin), 0.8 if contradicted else 0.75 if numeric else 0.6,
+                    "hallucination", ev)]
+
+
+@detector
+def run_status(run: RunView) -> List[Finding]:
+    r = run.root
+    if r["status"]["code"] != "ERROR" and r["attributes"].get("tdn.run.outcome") != "failure":
+        return []
+    msg = r["status"]["message"] or "run marked as failure"
+    other_errors = [s for s in run.spans if s is not r and s["status"]["code"] == "ERROR"]
+    if other_errors:
+        return []  # the failing step itself is the better symptom
+    cat = "unhandled_error" if re.match(r"^\w+(Error|Exception)\b", msg) else "reported_failure"
+    return [Finding(cat, msg, r["span_id"], 0, 0.5, "run_status", [f"root status: {msg}"], symptom=True)]

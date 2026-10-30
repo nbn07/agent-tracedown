@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tracedown</title>
+<style>
+:root {
+  --bg: #0d0f12; --panel: #14171c; --line: #252a32; --ink: #e6e8eb; --quiet: #8b939e;
+  --accent: #f5a524; --ok: #3fb950; --err: #f85149; --warn: #d29922;
+  --llm: #a371f7; --tool: #3b9eff; --retrieval: #2fbfa3; --agent: #8b939e; --memory: #db61a2; --decision: #d29922; --handoff: #6e7681;
+  --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: light) {
+  :root { --bg: #f6f7f9; --panel: #ffffff; --line: #e3e6ea; --ink: #16191d; --quiet: #5c6570; --accent: #b86e00; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 var(--sans); }
+header { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid var(--line); }
+header .logo { width: 22px; height: 22px; border-radius: 5px; background: #000; border: 2px solid var(--accent);
+  box-shadow: inset 0 0 0 3px #000, inset 0 0 0 6px var(--accent); }
+header h1 { font-size: 15px; margin: 0; letter-spacing: .2px; }
+header .tag { color: var(--quiet); font-size: 13px; }
+header .spacer { flex: 1; }
+header select { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }
+main { display: grid; grid-template-columns: 340px 1fr; height: calc(100vh - 51px); }
+@media (max-width: 860px) { main { grid-template-columns: 1fr; height: auto; } #runs { max-height: 40vh; } }
+#runs { border-right: 1px solid var(--line); overflow-y: auto; }
+.run { padding: 10px 16px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.run:hover, .run.active { background: var(--panel); }
+.run .top { display: flex; align-items: center; gap: 8px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.dot.success { background: var(--ok); } .dot.failure { background: var(--err); }
+.run .name { font-weight: 600; } .run .meta { color: var(--quiet); font-size: 12px; margin-left: auto; font-family: var(--mono); }
+.run .rc { color: var(--quiet); font-size: 12.5px; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.run .rc b { color: var(--accent); font-weight: 600; }
+#detail { overflow-y: auto; padding: 20px 24px 40px; }
+.empty { color: var(--quiet); padding: 40px; text-align: center; }
+h2 { font-size: 18px; margin: 0 0 4px; } .sub { color: var(--quiet); font-family: var(--mono); font-size: 12px; }
+section { margin-top: 22px; } section > h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--quiet); margin: 0 0 8px; }
+pre.trace { background: #000; color: #e6e8eb; border-left: 3px solid var(--err); padding: 14px 16px; border-radius: 6px;
+  font: 12.5px/1.55 var(--mono); overflow-x: auto; margin: 0; white-space: pre; }
+pre.trace .exc { color: #ff7b72; font-weight: 700; } pre.trace .rc { color: var(--accent); font-weight: 700; } pre.trace .dim { color: #8b939e; }
+.findings { display: grid; gap: 8px; }
+.finding { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; grid-template-columns: 56px 1fr; gap: 10px; }
+.finding.root { border-color: var(--accent); }
+.conf { font: 600 18px var(--mono); text-align: center; } .conf small { display: block; font: 10.5px var(--sans); color: var(--quiet); }
+.finding .label { font-weight: 600; } .finding .label .pill { font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 99px; margin-left: 6px; background: var(--accent); color: #000; }
+.finding .label .pill.sym { background: var(--line); color: var(--quiet); }
+.finding ul { margin: 4px 0 0; padding-left: 18px; color: var(--quiet); font-size: 12.5px; }
+.waterfall { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 0; }
+.row { display: grid; grid-template-columns: 34px minmax(180px, 34%) 1fr 64px; align-items: center; gap: 8px; padding: 3px 12px; cursor: pointer; font-size: 12.5px; }
+.row:hover, .row.sel { background: rgba(127,127,127,.09); }
+.row .st { color: var(--quiet); font-family: var(--mono); text-align: right; }
+.row .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .nm .k { display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin-right: 6px; }
+.row.err .nm { color: var(--err); } .row.rc .nm::after { content: "  ◀ root cause"; color: var(--accent); font-weight: 600; }
+.bar-wrap { position: relative; height: 14px; } .bar { position: absolute; height: 10px; top: 2px; border-radius: 3px; min-width: 3px; opacity: .85; }
+.row .ms { text-align: right; font-family: var(--mono); color: var(--quiet); }
+.graph { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow-x: auto; }
+.graph svg text { fill: var(--ink); font: 12px var(--sans); } .graph svg .q { fill: var(--quiet); font-size: 11px; }
+.span-detail { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+.span-detail pre { font: 12px/1.5 var(--mono); white-space: pre-wrap; word-break: break-word; margin: 6px 0 0; color: var(--ink); max-height: 260px; overflow: auto; }
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: 2px 14px; font: 12px var(--mono); }
+.kv span:nth-child(odd) { color: var(--quiet); }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; color: var(--quiet); font-size: 12px; margin-bottom: 6px; }
+.legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
+nav.tabs { display: flex; gap: 2px; margin-left: 18px; }
+nav.tabs a { color: var(--quiet); text-decoration: none; padding: 5px 10px; border-radius: 6px; font-size: 13px; }
+nav.tabs a.on, nav.tabs a:hover { color: var(--ink); background: var(--panel); }
+main.full { grid-template-columns: 1fr; } main.full #runs { display: none; }
+a { color: var(--accent); }
+.answer { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; font-size: 15px; line-height: 1.9; }
+.answer .tok-y { background: rgba(63,185,80,.22); border-radius: 3px; } .answer .tok-n { background: rgba(248,81,73,.35); border-radius: 3px; }
+.answer .claim { border-bottom: 2px solid transparent; padding-bottom: 1px; cursor: help; }
+.answer .claim.contradicted, .answer .claim.unsupported { border-color: var(--err); } .answer .claim.partial, .answer .claim.stale { border-color: var(--warn); }
+.answer .claim.supported { border-color: var(--ok); }
+table.t { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; font-size: 13px; }
+table.t th { text-align: left; font-weight: 600; color: var(--quiet); font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+table.t td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; } table.t tr:last-child td { border-bottom: 0; }
+table.t td.num { font-family: var(--mono); text-align: right; white-space: nowrap; }
+table.t tr.click { cursor: pointer; } table.t tr.click:hover td { background: rgba(127,127,127,.07); }
+.badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 99px; background: var(--line); color: var(--ink); }
+.badge.contradicted, .badge.unsupported, .badge.high, .badge.critical, .badge.drift, .badge.failure, .badge.open { background: rgba(248,81,73,.2); color: var(--err); }
+.badge.partial, .badge.stale, .badge.medium, .badge.acknowledged { background: rgba(210,153,34,.2); color: var(--warn); }
+.badge.supported, .badge.low, .badge.resolved, .badge.no_drift, .badge.success { background: rgba(63,185,80,.18); color: var(--ok); }
+.page { padding: 20px 24px 40px; overflow-y: auto; height: 100%; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.tile { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+.tile .v { font: 600 22px var(--mono); margin-top: 2px; } .tile .k { color: var(--quiet); font-size: 12px; }
+.btn { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; cursor: pointer; font-size: 12.5px; }
+.btn:hover { border-color: var(--accent); }
+.diff { display: grid; grid-template-columns: 40px 1fr 1fr; gap: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; font-size: 12.5px; }
+.diff > div { padding: 6px 10px; border-bottom: 1px solid var(--line); } .diff .h { font-weight: 600; color: var(--quiet); font-size: 11.5px; text-transform: uppercase; }
+.diff .chg { background: rgba(210,153,34,.10); } .diff .first { box-shadow: inset 3px 0 0 var(--accent); }
+.diff pre { margin: 4px 0 0; font: 11.5px var(--mono); white-space: pre-wrap; word-break: break-word; color: var(--quiet); max-height: 90px; overflow: hidden; }
+.feed { font: 12.5px var(--mono); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; max-height: 60vh; overflow-y: auto; }
+.feed div { padding: 2px 0; border-bottom: 1px dashed var(--line); }
+.chart text { fill: var(--quiet); font: 11px var(--sans); }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo" aria-hidden="true"></div>
+  <h1>Tracedown</h1>
+  <nav class="tabs" aria-label="Sections">
+    <a href="#/runs" data-tab="runs">Runs</a><a href="#/incidents" data-tab="incidents">Incidents</a>
+    <a href="#/drift" data-tab="drift">Drift</a><a href="#/analytics" data-tab="analytics">Analytics</a>
+    <a href="#/live" data-tab="live">Live</a>
+  </nav>
+  <span class="spacer"></span>
+  <select id="filter" aria-label="Filter runs"><option value="">All runs</option><option value="failure">Failures</option><option value="success">Successes</option></select>
+</header>
+<main>
+  <nav id="runs" aria-label="Runs"></nav>
+  <div id="detail"><div class="empty">Select a run. No runs yet? Run <code>python examples/run_demo.py --endpoint http://localhost:7070</code></div></div>
+</main>
+<script>
+const KIND_COLOR = k => `var(--${({llm:'llm',tool:'tool',retrieval:'retrieval',agent:'agent',memory:'memory',decision:'decision',handoff:'handoff'})[k]||'agent'})`;
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
+const api = p => fetch('/api/v1' + p).then(r => { if (!r.ok) throw new Error(r.status); return r.headers.get('content-type')?.includes('json') ? r.json() : r.text(); });
+const ago = ns => { const s = (Date.now() - ns / 1e6) / 1000; return s < 60 ? `${s|0}s` : s < 3600 ? `${s/60|0}m` : s < 86400 ? `${s/3600|0}h` : `${s/86400|0}d`; };
+
+async function loadRuns() {
+  const outcome = $('#filter').value;
+  const { runs } = await api('/runs?limit=200' + (outcome ? `&outcome=${outcome}` : ''));
+  $('#runs').innerHTML = runs.map(r => `
+    <div class="run" data-id="${r.trace_id}">
+      <div class="top"><span class="dot ${r.outcome}"></span><span class="name">${esc(r.agent_name)}</span>
+        <span class="meta">${r.trace_id.slice(0,8)} · ${ago(r.started_at)}</span></div>
+      <div class="rc">${r.root_cause ? `<b>${esc(r.root_cause.label)}</b> · ${esc(r.root_cause.title)}` :
+        r.replay_of ? `replay of ${r.replay_of.slice(0,8)}` : `${r.span_count} steps · ${r.duration_ms.toFixed(0)} ms`}</div>
+    </div>`).join('') || '<div class="empty">No runs</div>';
+  document.querySelectorAll('.run').forEach(el => el.onclick = () => location.hash = `#/runs/${el.dataset.id}`);
+  highlight();
+}
+function highlight() {
+  const id = location.hash.split('/')[2];
+  document.querySelectorAll('.run').forEach(el => el.classList.toggle('active', el.dataset.id === id));
+}
+
+function colorTrace(text) {
+  return esc(text).split('\n').map((l, i) =>
+    i === 0 ? `<span class="exc">${l}</span>` :
+    l.trimStart().startsWith('root cause') ? `<span class="rc">${l}</span>` :
+    /^\s+(run|evidence|also|next)/.test(l) ? `<span class="dim">${l}</span>` : l).join('\n');
+}
+
+function waterfall(spans, rcSpan) {
+  const t0 = Math.min(...spans.map(s => s.start_time)), t1 = Math.max(...spans.map(s => s.end_time || s.start_time));
+  const total = Math.max(t1 - t0, 1);
+  const depth = {}; const byId = Object.fromEntries(spans.map(s => [s.span_id, s]));
+  const d = s => depth[s.span_id] ??= s.parent_span_id && byId[s.parent_span_id] ? d(byId[s.parent_span_id]) + 1 : 0;
+  const rows = [...spans].sort((a, b) => (a.attributes['tdn.step'] ?? 0) - (b.attributes['tdn.step'] ?? 0));
+  return `<div class="legend">${['agent','llm','tool','retrieval','memory','decision','handoff'].map(k => `<span><i style="background:${KIND_COLOR(k)}"></i>${k}</span>`).join('')}</div>
+  <div class="waterfall">${rows.map(s => {
+    const left = (s.start_time - t0) / total * 100, w = ((s.end_time || s.start_time) - s.start_time) / total * 100;
+    const ms = ((s.end_time || s.start_time) - s.start_time) / 1e6;
+    return `<div class="row ${s.status.code === 'ERROR' ? 'err' : ''} ${s.span_id === rcSpan ? 'rc' : ''}" data-span="${s.span_id}">
+      <span class="st">${s.attributes['tdn.step'] ?? ''}</span>
+      <span class="nm" style="padding-left:${d(s) * 14}px"><span class="k" style="background:${KIND_COLOR(s.kind)}"></span>${esc(s.name)}</span>
+      <span class="bar-wrap"><span class="bar" style="left:${left}%;width:${w}%;background:${s.status.code === 'ERROR' ? 'var(--err)' : KIND_COLOR(s.kind)}"></span></span>
+      <span class="ms">${ms < 1 ? ms.toFixed(2) : ms.toFixed(0)} ms</span></div>`; }).join('')}</div>`;
+}
+
+function graphSvg(g) {
+  const agents = g.nodes.filter(n => n.type === 'agent'), others = g.nodes.filter(n => n.type !== 'agent');
+  const W = 150, H = 44, gapX = 30, rowA = 36, rowB = 146;
+  const cols = Math.max(agents.length, others.length, 1), width = cols * (W + gapX) + 40;
+  const pos = {};
+  agents.forEach((n, i) => pos[n.id] = [20 + i * (W + gapX), rowA]);
+  others.forEach((n, i) => pos[n.id] = [20 + i * (W + gapX), rowB]);
+  const edge = e => {
+    const a = pos[e.source], b = pos[e.target]; if (!a || !b) return '';
+    const sameRow = a[1] === b[1];
+    const x1 = a[0] + W / 2, y1 = a[1] + (sameRow ? H / 2 : H), x2 = b[0] + W / 2, y2 = b[1] + (sameRow ? H / 2 : 0);
+    const adjacent = Math.abs(a[0] - b[0]) <= W + gapX;
+    const path = sameRow ? (adjacent ? `M${a[0] + W} ${y1} L${b[0]} ${y2}` :
+      `M${x1} ${a[1]} C${x1} ${a[1] - 26} ${x2} ${b[1] - 26} ${x2} ${b[1] - 2}`) : `M${x1} ${y1} C${x1} ${(y1 + y2) / 2} ${x2} ${(y1 + y2) / 2} ${x2} ${y2 - 2}`;
+    const col = e.errors ? 'var(--err)' : 'var(--quiet)';
+    return `<path d="${path}" fill="none" stroke="${col}" stroke-width="${e.errors ? 2 : 1.2}" marker-end="url(#ar${e.errors ? 'e' : ''})"/>`;
+  };
+  const node = n => { const [x, y] = pos[n.id];
+    return `<g><rect x="${x}" y="${y}" width="${W}" height="${H}" rx="8" fill="none" stroke="${n.errors ? 'var(--err)' : KIND_COLOR(n.type)}" stroke-width="${n.errors ? 2 : 1.3}"/>
+      <text x="${x + W / 2}" y="${y + 19}" text-anchor="middle" font-weight="600">${esc(n.label.length > 20 ? n.label.slice(0, 19) + '…' : n.label)}</text>
+      <text class="q" x="${x + W / 2}" y="${y + 34}" text-anchor="middle">${n.type} · ${n.calls} call${n.calls > 1 ? 's' : ''}${n.errors ? ` · ${n.errors} error` : ''}</text></g>`; };
+  return `<svg width="${width}" height="${rowB + H + 20}" role="img" aria-label="Agent network">
+    <defs>${['', 'e'].map(s => `<marker id="ar${s}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="${s ? 'var(--err)' : 'var(--quiet)'}"/></marker>`).join('')}</defs>
+    ${g.edges.map(edge).join('')}${g.nodes.map(node).join('')}</svg>`;
+}
+
+async function spanDetail(span) {
+  const fetchBlob = d => d ? api(`/blobs/${encodeURIComponent(d)}?trace_id=${span.trace_id}`).then(b => b.content).catch(() => '(not captured)') : Promise.resolve(null);
+  const [inp, out] = await Promise.all([fetchBlob(span.input_digest), fetchBlob(span.output_digest)]);
+  const show = v => esc(typeof v === 'string' ? v : JSON.stringify(v, null, 2));
+  const attrs = Object.entries(span.attributes).filter(([k]) => !k.startsWith('tdn.retrieval.chunks'));
+  $('#span-detail').innerHTML = `<div class="span-detail">
+    <div style="font-weight:600">${esc(span.name)} <span class="sub">step ${span.attributes['tdn.step']} · ${span.kind} · ${span.status.code}</span></div>
+    ${span.status.message ? `<div style="color:var(--err);margin-top:4px">${esc(span.status.message)}</div>` : ''}
+    ${inp != null ? `<div style="margin-top:10px" class="sub">INPUT</div><pre>${show(inp)}</pre>` : ''}
+    ${out != null ? `<div style="margin-top:10px" class="sub">OUTPUT</div><pre>${show(out)}</pre>` : ''}
+    <div style="margin-top:10px" class="sub">ATTRIBUTES</div>
+    <div class="kv" style="margin-top:6px">${attrs.map(([k, v]) => `<span>${esc(k)}</span><span>${esc(typeof v === 'object' ? JSON.stringify(v) : v)}</span>`).join('')}</div>
+  </div>`;
+}
+
+async function showRun(id) {
+  highlight();
+  const det = $('#detail');
+  det.innerHTML = '<div class="empty">Loading…</div>';
+  let data, graph, trace = null;
+  try { [data, graph] = await Promise.all([api(`/runs/${id}`), api(`/runs/${id}/graph`)]); }
+  catch { det.innerHTML = '<div class="empty">Run not found</div>'; return; }
+  const run = data.run, f = data.findings;
+  if (run.outcome === 'failure' || f) trace = await api(`/runs/${id}/stacktrace`);
+  const rc = f?.root_cause;
+  det.innerHTML = `
+    <h2>${esc(run.agent_name)} <span class="dot ${run.outcome}" style="display:inline-block"></span></h2>
+    <div class="sub">${run.trace_id} · ${run.span_count} spans · ${run.duration_ms.toFixed(1)} ms · ${(run.input_tokens + run.output_tokens) || 0} tokens · ${run.models.join(', ') || 'no model'}${run.replay_of ? ` · replay of <a href="#/runs/${run.replay_of}">${run.replay_of.slice(0,8)}</a> · <a href="#/diff/${run.replay_of}/${run.trace_id}">compare side by side</a>` : ''}</div>
+    ${trace ? `<section><h3>AI stack trace</h3><pre class="trace">${colorTrace(trace)}</pre></section>` : ''}
+    ${f?.findings?.length ? `<section><h3>Ranked root-cause candidates</h3><div class="findings">${f.findings.map(x => `
+      <div class="finding ${x.root_cause || x === f.findings[0] ? 'root' : ''}">
+        <div class="conf">${Math.round(x.confidence * 100)}<small>confidence</small></div>
+        <div><div class="label">${esc(x.label)}${x === f.findings[0] ? '<span class="pill">root cause</span>' : ''}${x.symptom ? '<span class="pill sym">symptom</span>' : ''}
+          <span class="sub"> step ${x.step}</span></div>
+          <div>${esc(x.title)}</div><ul>${x.evidence.map(e => `<li>${esc(e)}</li>`).join('')}</ul></div>
+      </div>`).join('')}</div></section>` : ''}
+    <section id="claims"></section>
+    <section><h3>Agent network</h3><div class="graph">${graphSvg(graph)}</div></section>
+    <section><h3>Execution timeline</h3>${waterfall(data.spans, rc?.span_id)}</section>
+    <section id="span-detail"></section>`;
+  const byId = Object.fromEntries(data.spans.map(s => [s.span_id, s]));
+  det.querySelectorAll('.row').forEach(r => r.onclick = () => {
+    det.querySelectorAll('.row').forEach(x => x.classList.remove('sel')); r.classList.add('sel');
+    spanDetail(byId[r.dataset.span]);
+  });
+  const first = rc?.span_id || data.spans.find(s => s.status.code === 'ERROR')?.span_id;
+  if (first) det.querySelector(`.row[data-span="${first}"]`)?.click();
+  const root = data.spans.find(s => !s.parent_span_id);
+  if (root?.output_digest) api(`/runs/${id}/claims`).then(renderClaims).catch(() => {});
+}
+
+// ---------------------------------------------------------------- hallucination investigator
+function renderClaims(r) {
+  if (!r.claims.length) return;
+  const segs = [...r.segments].sort((a, b) => a.start - b.start);
+  const claimAt = c => r.claims.find(x => x.id === c);
+  let html = '', pos = 0;
+  for (const c of r.claims) {
+    html += esc(r.answer.slice(pos, c.start));
+    let inner = '', p = c.start;
+    for (const sgm of segs.filter(x => x.claim === c.id && x.support !== null)) {
+      inner += esc(r.answer.slice(p, sgm.start)) +
+        `<span class="${sgm.support ? 'tok-y' : 'tok-n'}">${esc(r.answer.slice(sgm.start, sgm.end))}</span>`;
+      p = sgm.end;
+    }
+    inner += esc(r.answer.slice(p, c.end));
+    html += `<span class="claim ${c.label}" title="${esc(c.label + (c.rationale ? ': ' + c.rationale : ''))}">${inner}</span>`;
+    pos = c.end;
+  }
+  html += esc(r.answer.slice(pos));
+  const sm = r.summary;
+  $('#claims').innerHTML = `<h3>Answer, claim by claim · hallucination score ${Math.round(sm.hallucination_score * 100)}%</h3>
+    <div class="answer">${html}</div>
+    <div class="legend" style="margin-top:6px"><span><i style="background:rgba(63,185,80,.5)"></i>term found in the best source</span>
+      <span><i style="background:rgba(248,81,73,.6)"></i>term in no source</span><span>underline = claim verdict (hover)</span></div>
+    <table class="t" style="margin-top:8px"><tr><th>Claim</th><th>Verdict</th><th>Best evidence</th><th>Written at</th></tr>
+    ${r.claims.filter(c => c.label !== 'no_claim').map(c => `<tr><td>${esc(c.text)}<div class="sub">${esc(c.rationale)}</div></td>
+      <td><span class="badge ${c.label}">${c.label}</span></td>
+      <td>${c.evidence[0] ? `${esc(c.evidence[0].source || c.evidence[0].unit)} <span class="sub">step ${c.evidence[0].step} · ${Math.round(c.evidence[0].score * 100)}%</span>` : '—'}</td>
+      <td class="num">${c.origin ? 'step ' + c.origin.step : '—'}</td></tr>`).join('')}</table>`;
+  alignHeaders($('#claims'));
+}
+
+// ---------------------------------------------------------------- pages
+const page = html => { $('#detail').innerHTML = `<div class="page">${html}</div>`; alignHeaders(); };
+function alignHeaders(root = document) {  // right-align a header over a numeric column
+  root.querySelectorAll('table.t').forEach(t => {
+    const first = [...t.rows].find(r => r.querySelector('td'));
+    if (!first) return;
+    [...first.cells].forEach((td, i) => { if (td.classList.contains('num') && t.rows[0].cells[i]) t.rows[0].cells[i].style.textAlign = 'right'; });
+  });
+}
+const fmtTime = ns => new Date(ns / 1e6).toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
+const pct = v => v == null ? '—' : `${Math.round(v * 100)}%`;
+const money = v => v == null ? '—' : v < 0.01 ? `$${v.toFixed(5)}` : `$${v.toFixed(3)}`;
+
+function bars(data, key, label, w = 640, h = 120, color = 'var(--accent)') {
+  if (!data.length) return '';
+  const max = Math.max(...data.map(d => d[key]), 1), bw = Math.min(40, (w - 40) / data.length - 4);
+  return `<svg class="chart" width="${w}" height="${h + 34}" role="img" aria-label="${esc(label)}">
+    ${data.map((d, i) => { const bh = d[key] / max * h, x = 30 + i * (bw + 4);
+      return `<rect x="${x}" y="${h - bh + 8}" width="${bw}" height="${bh}" rx="2" fill="${color}" opacity=".85"><title>${esc(d.label)}: ${d[key]}</title></rect>
+        <text x="${x + bw / 2}" y="${h + 24}" text-anchor="middle">${esc(d.label)}</text>`; }).join('')}
+    <text x="0" y="16">${max}</text><text x="0" y="${h + 8}">0</text></svg>`;
+}
+
+async function showIncidents(id) {
+  if (id) return showIncident(id);
+  const { incidents } = await api('/incidents');
+  page(`<h2>Incidents</h2><div class="sub">runs grouped by shared root cause</div><section>
+    ${incidents.length ? `<table class="t"><tr><th>Severity</th><th>Status</th><th>Incident</th><th>Runs</th><th>Last seen</th></tr>
+    ${incidents.map(i => `<tr class="click" onclick="location.hash='#/incidents/${i.id}'"><td><span class="badge ${i.severity}">${i.severity}</span></td>
+      <td><span class="badge ${i.status}">${i.status}</span></td><td><b>#${i.id}</b> ${esc(i.title)}<div class="sub">${esc(i.root_cause)}</div></td>
+      <td class="num">${i.run_count}</td><td class="num">${fmtTime(i.last_seen)}</td></tr>`).join('')}</table>` : '<div class="empty">No incidents</div>'}</section>`);
+}
+
+async function showIncident(id) {
+  const i = await api(`/incidents/${id}`);
+  const hours = i.timeline.runs_per_hour.map(b => ({ label: new Date(b.hour_unix * 1000).toISOString().slice(11, 16), runs: b.runs }));
+  page(`<a href="#/incidents">← Incidents</a><h2 style="margin-top:8px">#${i.id} ${esc(i.title)}</h2>
+    <div class="sub"><span class="badge ${i.severity}">${i.severity}</span> <span class="badge ${i.status}">${i.status}</span> · ${i.run_count} runs · first ${fmtTime(i.first_seen)} · last ${fmtTime(i.last_seen)}</div>
+    <section><h3>Root cause</h3><div class="answer" style="font-size:14px;line-height:1.5">${esc(i.root_cause)}</div></section>
+    <section><h3>Suggested fix</h3><div class="answer" style="font-size:14px;line-height:1.5">${esc(i.suggested_fix || '—')}</div></section>
+    <section><h3>Affected runs per hour</h3>${bars(hours, 'runs', 'runs per hour')}</section>
+    <section><h3>Timeline</h3><table class="t">${i.timeline.events.map(e => `<tr><td class="sub" style="width:180px">${fmtTime(e.at)}</td><td><span class="badge">${e.kind}</span></td>
+      <td class="sub">${esc(e.detail ? JSON.stringify(e.detail) : '')}</td></tr>`).join('')}</table></section>
+    <section><h3>Affected runs</h3>${i.affected_runs.map(t => `<a href="#/runs/${t}">${t.slice(0, 8)}</a>`).join(' · ')}</section>
+    <section><button class="btn" data-s="acknowledged">Acknowledge</button> <button class="btn" data-s="resolved">Resolve</button> <button class="btn" data-s="open">Reopen</button></section>`);
+  document.querySelectorAll('button[data-s]').forEach(b => b.onclick = async () => {
+    await fetch(`/api/v1/incidents/${id}/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: b.dataset.s }) });
+    showIncident(id);
+  });
+}
+
+async function showDrift(sel) {
+  const { reports } = await api('/drift/reports');
+  const cur = reports.find(r => String(r.id) === sel) || reports.find(r => r.verdict === 'drift') || reports[0];
+  const r = cur?.report;
+  page(`<h2>Drift</h2><div class="sub">behaviour change between versions of a prompt, model, tool schema, knowledge base or release</div>
+    <section>${reports.length ? `<table class="t"><tr><th>Verdict</th><th>Agent</th><th>Dimension</th><th>Baseline → candidate</th><th>Runs</th></tr>
+      ${reports.map(x => `<tr class="click" onclick="location.hash='#/drift/${x.id}'" style="${x === cur ? 'outline:1px solid var(--accent)' : ''}">
+        <td><span class="badge ${x.verdict}">${x.verdict.replace('_', ' ')}</span> <span class="badge ${x.severity}">${x.severity}</span></td><td>${esc(x.agent)}</td><td>${x.dimension}</td>
+        <td class="sub">${esc(x.baseline)} → ${esc(x.candidate)}</td><td class="num">${x.report.runs.a} / ${x.report.runs.b}</td></tr>`).join('')}</table>` :
+      '<div class="empty">No drift reports yet. They are written automatically when a dimension gets a new value and both cohorts reach the minimum number of runs.</div>'}</section>
+    ${r ? `<section><p style="font-weight:600;margin:0 0 10px">${esc(r.headline)}</p>
+      <div class="tiles"><div class="tile"><div class="k">success rate · ${esc(r.baseline)}</div><div class="v">${pct(r.success_rate.a)}</div></div>
+        <div class="tile"><div class="k">success rate · ${esc(r.candidate)}</div><div class="v">${pct(r.success_rate.b)}</div></div>
+        <div class="tile"><div class="k">p-value</div><div class="v">${r.success_rate.p_value ?? '—'}</div></div>
+        <div class="tile"><div class="k">tool-mix divergence (JSD)</div><div class="v">${r.tool_mix.jsd}</div></div>
+        <div class="tile"><div class="k">tokens per run</div><div class="v">${r.tokens.a} → ${r.tokens.b}</div></div></div>
+      <h3 style="margin-top:16px">Tool calls per run</h3><table class="t"><tr><th>Tool</th><th>${esc(r.baseline)}</th><th>${esc(r.candidate)}</th><th>Error rate</th><th></th></tr>
+      ${r.tool_mix.tools.map(t => `<tr><td>${esc(t.tool)}</td><td class="num">${t.calls_per_run_a}</td><td class="num">${t.calls_per_run_b}</td>
+        <td class="num">${pct(t.error_rate_a)} → ${pct(t.error_rate_b)}</td><td><span class="badge ${t.status === 'same' ? '' : 'medium'}">${t.status}</span></td></tr>`).join('')}</table>
+      <h3 style="margin-top:16px">Signals</h3><ul>${r.signals.map(x => `<li>${esc(x)}</li>`).join('') || '<li>none</li>'}</ul></section>` : ''}`);
+}
+
+async function showAnalytics() {
+  const a = await api('/analytics?days=7'), o = a.overall;
+  const daily = a.daily.map(d => ({ label: d.day.slice(5), runs: d.runs, failures: d.failures }));
+  page(`<h2>Analytics</h2><div class="sub">last ${a.window_days} days</div>
+    <section><div class="tiles">
+      <div class="tile"><div class="k">runs</div><div class="v">${o.runs}</div></div>
+      <div class="tile"><div class="k">success rate</div><div class="v">${pct(o.success_rate)}</div></div>
+      <div class="tile"><div class="k">p95 latency</div><div class="v">${o.latency_ms.p95 ?? '—'} ms</div></div>
+      <div class="tile"><div class="k">cost per task</div><div class="v">${money(o.cost_usd.per_task)}</div></div>
+      <div class="tile"><div class="k">hallucination rate</div><div class="v">${pct(o.hallucination_rate)}</div></div>
+      <div class="tile"><div class="k">response quality</div><div class="v">${pct(o.response_quality)}</div></div></div>
+      ${o.cost_usd.runs_without_price ? `<div class="sub" style="margin-top:6px">${o.cost_usd.runs_without_price} runs use models without a configured price (PUT /api/v1/settings/prices)</div>` : ''}</section>
+    <section><h3>Runs per day</h3>${bars(daily, 'runs', 'runs per day')}</section>
+    <section><h3>Agents</h3><table class="t"><tr><th>Agent</th><th>Runs</th><th>Success</th><th>p50 / p95 ms</th><th>Tokens/run</th><th>Cost/task</th><th>Halluc.</th><th>Top root cause</th></tr>
+      ${Object.entries(a.agents).map(([n, x]) => `<tr><td><a href="#/network/${encodeURIComponent(n)}">${esc(n)}</a></td><td class="num">${x.runs}</td><td class="num">${pct(x.success_rate)}</td>
+        <td class="num">${x.latency_ms.p50} / ${x.latency_ms.p95}</td><td class="num">${x.tokens.per_run}</td><td class="num">${money(x.cost_usd.per_task)}</td>
+        <td class="num">${pct(x.hallucination_rate)}</td><td class="sub">${x.top_root_causes.map(([c, k]) => `${c} (${k})`).join(', ') || '—'}</td></tr>`).join('')}</table></section>
+    <section><h3>Tool reliability</h3><table class="t"><tr><th>Tool</th><th>Calls</th><th>Error rate</th><th>p50 / p95 ms</th></tr>
+      ${a.tools.map(t => `<tr><td>${esc(t.tool)}</td><td class="num">${t.calls}</td><td class="num">${pct(t.error_rate)}</td><td class="num">${t.latency_ms.p50} / ${t.latency_ms.p95}</td></tr>`).join('')}</table></section>
+    <section><h3>Retrieval effectiveness</h3><table class="t"><tr><th>Source</th><th>Queries</th><th>Empty</th><th>Low score</th><th>Stale hit</th><th>Reached answer</th></tr>
+      ${a.retrieval.map(r => `<tr><td>${esc(r.source)}</td><td class="num">${r.queries}</td><td class="num">${pct(r.empty_rate)}</td><td class="num">${pct(r.low_score_rate)}</td>
+        <td class="num">${pct(r.stale_rate)}</td><td class="num">${pct(r.reached_answer_rate)}</td></tr>`).join('') || '<tr><td colspan="6" class="sub">no retrievals</td></tr>'}</table></section>`);
+}
+
+let live = null;
+function showLive() {
+  page(`<h2>Live</h2><div class="sub">spans as agents send them (SDK: <code>tdn.init(..., stream=True)</code>)</div><section><div class="feed" id="feed"><div class="sub">waiting for events…</div></div></section>`);
+  if (live) live.close();
+  live = new EventSource('/api/v1/live');
+  const add = html => { const f = $('#feed'); if (!f) return live.close(); f.insertAdjacentHTML('afterbegin', `<div>${html}</div>`); };
+  live.addEventListener('spans', e => { const d = JSON.parse(e.data);
+    d.spans.forEach(s => add(`<span class="sub">${d.trace_id.slice(0, 8)}</span> step ${s.step ?? ''} <span style="color:${KIND_COLOR(s.kind)}">${s.kind}</span> ${esc(s.name)} ${s.status?.code === 'ERROR' ? '<span class="badge failure">error</span>' : ''}`)); });
+  live.addEventListener('run', e => { const d = JSON.parse(e.data);
+    add(`<b><a href="#/runs/${d.trace_id}">${d.trace_id.slice(0, 8)}</a> ${esc(d.agent)} finished</b> <span class="badge ${d.outcome}">${d.outcome}</span> ${d.root_cause ? esc(d.root_cause) : ''}`); });
+  live.addEventListener('drift', e => { const d = JSON.parse(e.data); add(`<b>drift</b> ${esc(d.headline)}`); });
+}
+
+async function showNetwork(agent) {
+  agent = decodeURIComponent(agent);
+  const g = await api(`/agents/${encodeURIComponent(agent)}/graph?limit=500`);
+  page(`<a href="#/analytics">← Analytics</a><h2 style="margin-top:8px">${esc(agent)} · agent network</h2>
+    <div class="sub">${g.runs} recent runs · red = calls that failed</div><section><div class="graph">${graphSvg(g)}</div></section>
+    <section><table class="t"><tr><th>From</th><th>To</th><th>Calls</th><th>Runs</th><th>Error rate</th></tr>
+    ${g.edges.sort((x, y) => y.calls - x.calls).map(e => `<tr><td>${esc(e.source)}</td><td>${esc(e.target)}</td><td class="num">${e.calls}</td>
+      <td class="num">${e.runs}</td><td class="num">${pct(e.error_rate)}</td></tr>`).join('')}</table></section>`);
+}
+
+async function showDiff(a, b) {
+  const d = await api(`/diff?a=${a}&b=${b}`);
+  const out = x => x?.output ? `<pre>${esc(x.output.slice(0, 300))}</pre>` : '';
+  page(`<h2>Replay comparison</h2><div class="sub">original <a href="#/runs/${a}">${a.slice(0, 8)}</a> <span class="badge ${d.outcome_a}">${d.outcome_a}</span>
+    → replay <a href="#/runs/${b}">${b.slice(0, 8)}</a> <span class="badge ${d.outcome_b}">${d.outcome_b}</span> · first divergence at step ${d.first_divergence ?? '—'}</div>
+    <section><div class="diff"><div class="h">step</div><div class="h">original</div><div class="h">replay</div>
+    ${d.steps.map(r => { const cls = (r.change !== 'same' ? 'chg ' : '') + (r.step === d.first_divergence ? 'first' : '');
+      const cell = x => x ? `<b>${esc(x.name)}</b> <span class="badge ${x.status === 'ERROR' ? 'failure' : ''}">${x.status}</span>${out(x)}` : '<span class="sub">—</span>';
+      return `<div class="${cls}">${r.step}</div><div class="${cls}">${cell(r.a)}</div><div class="${cls}">${cell(r.b)}<div class="sub">${r.change}</div></div>`; }).join('')}
+    </div></section>`);
+}
+
+function route() {
+  const parts = location.hash.replace(/^#\//, '').split('/');
+  const tab = parts[0] || 'runs';
+  document.querySelectorAll('nav.tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === tab || (tab === 'diff' && a.dataset.tab === 'runs') || (tab === 'network' && a.dataset.tab === 'analytics')));
+  document.querySelector('main').classList.toggle('full', tab !== 'runs');
+  $('#filter').style.display = tab === 'runs' ? '' : 'none';
+  if (tab !== 'live' && live) { live.close(); live = null; }
+  if (tab === 'runs' && parts[1]) return showRun(parts[1]);
+  if (tab === 'runs') return;
+  ({ incidents: () => showIncidents(parts[1]), drift: () => showDrift(parts[1]), analytics: showAnalytics,
+     live: showLive, diff: () => showDiff(parts[1], parts[2]), network: () => showNetwork(parts[1]) })[tab]?.();
+}
+$('#filter').onchange = loadRuns;
+window.addEventListener('hashchange', route);
+loadRuns().then(route);
+setInterval(() => { if (!document.querySelector('main').classList.contains('full')) loadRuns(); }, 5000);
+</script>
+</body>
+</html>

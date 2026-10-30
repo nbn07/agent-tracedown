@@ -1,0 +1,32 @@
+name: ci
+on: [push, pull_request]
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.10", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "${{ matrix.python }}" }
+      - run: pip install -e ./sdk/python -e "./server[dev]"
+      - run: pytest -q
+      - name: RCA benchmark (holdout) must not regress
+        run: |
+          python benchmark/score.py --split holdout --json bench.json
+          python -c "import json,sys; r=json.load(open('bench.json'))['agent-tracedown']; sys.exit(0 if r['exact@1'] >= 0.95 else 1)"
+
+  frameworks:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        extra: [langgraph, openai-agents, crewai, autogen, semantic-kernel, llamaindex]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install pytest -e "./sdk/python[${{ matrix.extra }}]"
+      - run: PYTHONPATH=sdk/python pytest -q sdk/python/tests/integrations

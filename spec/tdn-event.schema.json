@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/nbn07/agent-tracedown/blob/main/spec/tdn-event.schema.json",
+  "title": "TDN span (Tracedown telemetry spec v0.1)",
+  "description": "One step of an agent run. OpenTelemetry span fields plus gen_ai.* (OTel GenAI semantic conventions) and tdn.* attributes. Large payloads are referenced by SHA-256 digest and shipped separately as blobs.",
+  "type": "object",
+  "required": ["trace_id", "span_id", "name", "kind", "start_time"],
+  "properties": {
+    "trace_id": {"type": "string", "pattern": "^[0-9a-f]{32}$", "description": "One run = one trace."},
+    "span_id": {"type": "string", "pattern": "^[0-9a-f]{16}$"},
+    "parent_span_id": {"type": ["string", "null"], "pattern": "^[0-9a-f]{16}$"},
+    "name": {"type": "string", "description": "OTel GenAI naming: '{operation} {target}', e.g. 'execute_tool calendar_create_event'."},
+    "kind": {"enum": ["agent", "llm", "tool", "retrieval", "embedding", "memory", "decision", "handoff"]},
+    "start_time": {"type": "integer", "description": "Unix epoch nanoseconds."},
+    "end_time": {"type": ["integer", "null"]},
+    "status": {
+      "type": "object",
+      "properties": {"code": {"enum": ["UNSET", "OK", "ERROR"]}, "message": {"type": "string"}}
+    },
+    "input_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+    "output_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+    "attributes": {
+      "type": "object",
+      "properties": {
+        "gen_ai.operation.name": {"enum": ["invoke_agent", "create_agent", "chat", "text_completion", "generate_content", "execute_tool", "embeddings", "retrieval"]},
+        "gen_ai.agent.name": {"type": "string"},
+        "gen_ai.provider.name": {"type": "string"},
+        "gen_ai.request.model": {"type": "string"},
+        "gen_ai.request.temperature": {"type": "number"},
+        "gen_ai.request.seed": {"type": "integer"},
+        "gen_ai.usage.input_tokens": {"type": "integer"},
+        "gen_ai.usage.output_tokens": {"type": "integer"},
+        "gen_ai.tool.name": {"type": "string"},
+
+        "tdn.step": {"type": "integer", "minimum": 0, "description": "Order of the step within the run; root = 0. Replay matches steps by this index."},
+        "tdn.agent.name": {"type": "string", "description": "Nearest enclosing agent of a non-agent span."},
+        "tdn.agent.role": {"type": "string"},
+        "tdn.run.root": {"type": "boolean"},
+        "tdn.run.outcome": {"enum": ["success", "failure"]},
+        "tdn.step_budget": {"type": "integer"},
+        "tdn.prompt.version": {"type": "string"},
+        "tdn.llm.context_limit": {"type": "integer"},
+        "tdn.llm.context_utilization": {"type": "number", "minimum": 0},
+        "tdn.tool.args_valid": {"type": "boolean"},
+        "tdn.tool.schema_hash": {"type": "string"},
+        "tdn.tool.validation_errors": {"type": "array", "items": {"type": "string"}},
+        "tdn.retrieval.query": {"type": "string"},
+        "tdn.retrieval.source": {"type": "string"},
+        "tdn.retrieval.count": {"type": "integer"},
+        "tdn.retrieval.max_score": {"type": "number"},
+        "tdn.retrieval.chunks": {
+          "type": "array",
+          "items": {"type": "object", "properties": {
+            "id": {"type": "string"}, "source": {"type": "string"}, "score": {"type": "number"},
+            "version": {"type": "string"}, "stale": {"type": "boolean"}}}
+        },
+        "tdn.memory.op": {"enum": ["read", "write", "delete"]},
+        "tdn.memory.key": {"type": "string"},
+        "tdn.memory.value_digest": {"type": "string"},
+        "tdn.decision.options": {"type": "array", "items": {"type": "string"}},
+        "tdn.decision.chosen": {"type": "string"},
+        "tdn.decision.rationale": {"type": "string"},
+        "tdn.decision.precondition_ok": {"type": "boolean"},
+        "tdn.handoff.from": {"type": "string"},
+        "tdn.handoff.to": {"type": "string"},
+        "tdn.replay.of": {"type": "string", "description": "trace_id of the run this run replays."},
+        "tdn.replay.mode": {"enum": ["exact", "from-step", "swap", "full"]},
+        "tdn.replay.source": {"enum": ["recorded", "live", "live-diverged"]}
+      },
+      "additionalProperties": true
+    }
+  }
+}

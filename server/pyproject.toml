@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-tracedown-server"
+version = "0.2.0"
+description = "Tracedown server: ingest, query, root-cause analysis and replay planning."
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+dependencies = ["fastapi>=0.110", "uvicorn>=0.29", "pydantic>=2"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "httpx>=0.27", "chdb>=2", "pyjwt[crypto]>=2.8"]
+sso = ["pyjwt[crypto]>=2.8"]
+clickhouse = []                      # HTTP client is stdlib; add chdb for embedded/local use
+kafka = ["confluent-kafka>=2.3"]
+enterprise = ["pyjwt[crypto]>=2.8", "confluent-kafka>=2.3"]
+
+[project.scripts]
+tracedown-server = "tracedown_server.__main__:main"
+tracedown-worker = "tracedown_server.enterprise.queue:main"
+
+[tool.setuptools.packages.find]
+include = ["tracedown_server*"]
+
+[tool.setuptools.package-data]
+tracedown_server = ["static/*"]
