@@ -25,6 +25,10 @@ CATEGORY_LABELS = {
     "unhandled_error": "Unhandled error",
     "reported_failure": "Run marked failed",
     "wrong_tool": "Wrong tool selected",
+    "unverified_action": "Suspect action (first state change)",
+    "judged": "Diagnosis by LLM judge",
+    "incomplete_task": "Task left incomplete",
+    "policy_violation": "Policy violation",
 }
 
 
@@ -103,23 +107,68 @@ def text_of(value: Any) -> str:
 
 # ----------------------------------------------------------------------------- detectors
 
+_READ_VERBS = ("get", "list", "search", "find", "read", "fetch", "lookup", "look", "query", "retrieve",
+               "calculate", "compute", "think", "check", "validate", "describe", "show", "count", "view")
+
+
+def has_side_effects(span: Dict[str, Any], declared: Dict[str, Any]) -> bool:
+    """Does this tool change the world? Declared ``side_effects`` wins; otherwise the verb in
+    its name decides (``get_order`` reads, ``cancel_order`` writes)."""
+    name = span["attributes"].get("gen_ai.tool.name") or span["name"]
+    decl = declared.get(name) or {}
+    if "side_effects" in decl:
+        return bool(decl["side_effects"])
+    verb = re.split(r"[_\-.]|(?<=[a-z])(?=[A-Z])", name)[0].lower()
+    return verb not in _READ_VERBS
+
+
+# Errors that mean "the service or network failed", as opposed to "the system said no".
+_INFRA = re.compile(r"\b(5\d\d|timed? ?out|timeout|unavailable|connection|refused to connect|reset by peer|"
+                    r"internal (server )?error|bad gateway|service error|rate.?limit|429|throttl)", re.I)
+
+
 @detector
 def tool_errors(run: RunView) -> List[Finding]:
     out = []
+    declared = {t.get("name"): t for t in (run.root["attributes"].get("tdn.tools.available") or [])
+                if isinstance(t, dict)}
+    successful_writes = [t for t in run.of_kind("tool") if t["status"]["code"] != "ERROR"
+                         and has_side_effects(t, declared)]
     for s in run.of_kind("tool"):
         if s["status"]["code"] != "ERROR":
             continue
         a = s["attributes"]
         tool = a.get("gen_ai.tool.name", s["name"])
         invalid = a.get("tdn.tool.args_valid") is False
-        retry = next((t for t in run.of_kind("tool") if run.step(t) > run.step(s) and t["status"]["code"] != "ERROR"
-                      and t["attributes"].get("gen_ai.tool.name") == tool
-                      and t.get("input_digest") == s.get("input_digest")), None)
-        if retry is not None:
-            # Recovered: the same call succeeded later, so this error did not cause the outcome.
-            out.append(Finding("tool_failure", f"{tool}() failed once and succeeded on retry: {s['status']['message']}",
+        writes = has_side_effects(s, declared)
+        later = [t for t in run.spans if run.step(t) > run.step(s) and t["kind"] in ("tool", "llm")
+                 and t["status"]["code"] != "ERROR"]
+        if not writes and not invalid and later:
+            # A failed lookup changes nothing; the agent carried on, so it did not decide the outcome.
+            out.append(Finding("tool_failure", f"{tool}() lookup failed and the agent continued: {s['status']['message']}",
                                s["span_id"], run.step(s), 0.3, "tool_errors",
-                               [f"step {run.step(retry)} repeated the call successfully"]))
+                               [f"{tool} reads data only; {len(later)} later step(s) succeeded"]))
+            continue
+        if writes and not invalid and not _INFRA.search(s["status"]["message"] or ""):
+            # The system refused an action: the agent attempted something whose precondition did not hold.
+            decided_elsewhere = [t for t in successful_writes if t is not s]
+            out.append(Finding("planning_failure", f"Attempted {tool}() but the system refused: {s['status']['message']}",
+                               s["span_id"], run.step(s), 0.5 if decided_elsewhere else 0.85, "tool_errors",
+                               [f"step {run.step(s)} {s['status']['message']}",
+                                f"arguments: {json.dumps(run.input(s), default=str)[:200]}",
+                                (f"{len(decided_elsewhere)} other state-changing call(s) did succeed"
+                                 if decided_elsewhere else "no other state-changing call succeeded")]))
+            continue
+        retry = next((t for t in run.of_kind("tool") if run.step(t) > run.step(s) and t["status"]["code"] != "ERROR"
+                      and t["attributes"].get("gen_ai.tool.name") == tool), None)
+        if retry is not None:
+            # Recovered: the agent called the same tool successfully later (same or corrected
+            # arguments), so this error did not decide the outcome.
+            same = retry.get("input_digest") == s.get("input_digest")
+            out.append(Finding("tool_failure", f"{tool}() failed and the agent recovered: {s['status']['message']}",
+                               s["span_id"], run.step(s), 0.3, "tool_errors",
+                               [f"step {run.step(retry)} called {tool}() successfully"
+                                + (" with the same arguments" if same else " with corrected arguments")]))
             continue
         out.append(Finding(
             category="invalid_tool_args" if invalid else "tool_failure",
@@ -190,17 +239,44 @@ def wrong_tool(run: RunView) -> List[Finding]:
                                 f"{fits[0]} schema accepts the same arguments",
                                 f"arguments: {json.dumps(args, default=str)[:160]}"]))
             continue
-        if failed and request:
+        if failed and request and has_side_effects(s, by_name):
             def overlap(t):
                 return len(request & _words(f"{t.get('name', '')} {t.get('description', '')}".replace("_", " ")))
             mine = overlap(chosen)
             best_name, best = max(((n, overlap(t)) for n, t in by_name.items() if n != name),
                                   key=lambda x: x[1], default=(None, 0))
             if best_name and best >= 2 and best >= 2 * max(mine, 1):
+                # Keyword overlap is a hint, not evidence (38% precision on real τ-bench runs).
                 out.append(Finding("wrong_tool", f"Request matches {best_name}() better than the chosen {name}()",
-                                   s["span_id"], run.step(s), 0.55, "wrong_tool",
+                                   s["span_id"], run.step(s), 0.45, "wrong_tool",
                                    [f"request shares {best} terms with {best_name}'s description, {mine} with {name}'s"]))
     return out
+
+
+@detector
+def point_of_no_return(run: RunView) -> List[Finding]:
+    """In a run that failed on its outcome, the first state-changing tool call is the prime
+    suspect: before it nothing was decided; after it, the damage was done.
+
+    A prior, not proof. It ranks below any direct evidence and above "run marked failed".
+    """
+    r = run.root
+    if r["status"]["code"] != "ERROR" and r["attributes"].get("tdn.run.outcome") != "failure":
+        return []
+    declared = {t.get("name"): t for t in (r["attributes"].get("tdn.tools.available") or []) if isinstance(t, dict)}
+    writes = [s for s in run.of_kind("tool") if has_side_effects(s, declared)]
+    if not writes:
+        return []
+    # The first *attempted* state change, even if the system refused it: that is where the
+    # agent first committed to a course (measured better than "first successful" on τ-bench dev).
+    first = writes[0]
+    name = first["attributes"].get("gen_ai.tool.name", first["name"])
+    others = len(writes) - 1
+    return [Finding("unverified_action", f"First state-changing call before the failure: {name}()",
+                    first["span_id"], run.step(first), 0.55, "point_of_no_return",
+                    [f"arguments: {json.dumps(run.input(first), default=str)[:200]}",
+                     f"{others} later state-changing call(s)" if others else "the only state-changing call in the run",
+                     "no direct error explains the failure; check this action against the request"])]
 
 
 @detector

@@ -96,6 +96,12 @@ _CLAUSE = re.compile(r";\s+|,\s+(?:and|but|while|whereas)\s+|\s+and\s+(?=(?:incl
                      r"were|will|costs?|provides?|supports?|gives?|requires?|takes?)\b)")
 
 
+# Sentences that offer help or close the conversation state nothing to verify.
+_COURTESY = re.compile(r"\b(let (me|us) know|feel free|anything else|happy to help|glad (I|to) (could )?help|"
+                       r"how (else )?can I (help|assist)|is there anything|have a (great|nice|good) (day|trip)|"
+                       r"don't hesitate|thank you for (contacting|reaching|your patience)|I hope)\b", re.I)
+
+
 @dataclass
 class Claim:
     id: str
@@ -186,6 +192,14 @@ def evidence_units(run) -> List[Unit]:
             key = a.get("tdn.memory.key")
             units.append(Unit(f"memory:{key}@{step}", "memory", f"{key}: {run.output(s)}", step, s["span_id"],
                               source=key))
+        elif s["kind"] == "llm" and s.get("input_digest"):
+            # Multi-turn agents: what the user said later in the conversation is evidence too
+            # (weaker than a tool result, like the first message).
+            said = [m.get("content") for m in (run.input(s) if isinstance(run.input(s), list) else [])
+                    if isinstance(m, dict) and m.get("role") == "user" and isinstance(m.get("content"), str)]
+            if said:
+                units.append(Unit(f"conversation@{step}", "input", "\n".join(said), step, s["span_id"],
+                                  source="user", weight=0.6))
     if run.root.get("input_digest"):
         inp = run.input(run.root)
         units.append(Unit("user_input", "input", "\n".join(_flatten(inp)), 0, run.root["span_id"],
@@ -236,7 +250,7 @@ def investigate(run, judge: Optional[Judge] = None) -> Dict[str, Any]:
         topical = [u for sc, _, u in scored if sc >= 0.35] or units
         missing_nums = sorted(n for n in nums if not any(n in u.nums for u in topical))
         rationale = ""
-        if len(content) <= 2 and not nums:
+        if (len(content) <= 2 and not nums) or (_COURTESY.search(c.text) and not nums):
             label = "no_claim"
         elif missing_nums and best is not None and best_score >= 0.4 and best.nums - nums:
             label = "contradicted"

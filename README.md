@@ -111,7 +111,16 @@ On the bundled benchmark, [TDN-RCA-Bench v0](benchmark/README.md): 10 failure fa
 | Tracedown, correct cause *and* step | 100% | 93% |
 | "first error span" baseline | 10% | — |
 
-These are synthetic runs from the same ten scenario structures the engine was built around. They show robustness to wording and noise, not to unseen failure shapes. The next benchmark version needs real, labelled production failures. Contributions are welcome.
+These are synthetic runs from the same ten scenario structures the engine was built around. They show robustness to wording and noise, not to unseen failure shapes.
+
+**On real failures** ([realworld/](realworld/README.md)): 499 failed τ-bench runs by Claude 3.5 Sonnet, held out while tuning on GPT-4o, with a labelling protocol fixed before scoring.
+
+| | right step, top 1 | right step, top 3 |
+|---|---|---|
+| Tracedown (rules only) | 65% | 82% |
+| "first state-changing call" baseline | 74% | 74% |
+
+The rules find the right neighbourhood but lose to a simple prior on the first guess, and they rarely name the kind of mistake: most real failures are the right action with the wrong item. The optional LLM judge (`TDN_JUDGE`) targets exactly that and is next to be measured. `realworld/live/` also has harnesses that run the OpenAI Agents SDK customer-service example, a LangGraph SQL agent and τ-bench live with your own model.
 
 ## Configuration
 

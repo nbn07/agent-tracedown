@@ -333,3 +333,63 @@ def test_otlp_roundtrip_and_forwarding(monkeypatch, env):
         pass
     push(client, mem)
     assert sent and sent[0][0]["name"] == "invoke_agent FwdBot"
+
+
+# ----------------------------------------------------------------------------- LLM judge
+
+def _failed_refund_run(mem):
+    """A run that fails with no direct evidence: the agent refunds the wrong order."""
+    with tdn.run("SupportBot", input="Refund my order #2 please") as run:
+        abx_orders = tdn.tool_call("get_orders", {"user": "u1"}, lambda user: {"orders": ["#1", "#2"]})
+        tdn.llm_call(lambda p, **_: {"text": "refunding #1"}, prompt=abx_orders, model="m")
+        tdn.tool_call("refund_order", {"order_id": "#1"}, lambda order_id: {"ok": True})
+        run.output("Your refund is on its way.")
+        run.fail("customer: wrong order refunded")
+    return run.trace_id
+
+
+def test_judge_adds_semantic_finding_when_rules_are_weak(mem):
+    from tracedown_server.rca.judge import transcript
+    tid = _failed_refund_run(mem)
+    prompts = []
+
+    def judge(prompt):
+        prompts.append(prompt)
+        return '{"step": 3, "category": "bad_llm_output", "confidence": 0.9, "explanation": "refunded #1 but the user asked for #2"}'
+
+    rep = analyze(mem.trace(tid), mem.blobs, judge=judge)
+    top = rep["root_cause"]
+    assert top["detector"] == "llm_judge" and top["category"] == "bad_llm_output" and top["step"] == 3
+    assert "TOOL refund_order" in prompts[0] and "Refund my order #2" in prompts[0]
+    assert "refunded #1" in " ".join(top["evidence"])
+
+
+def test_judge_not_called_when_rules_have_direct_evidence(mem):
+    try:
+        demo.calendar_agent()
+    except tdn.ToolError:
+        pass
+    tid = mem.spans[-1]["trace_id"]
+    called = []
+    rep = analyze(mem.trace(tid), mem.blobs, judge=lambda p: called.append(p) or "{}")
+    assert called == [] and rep["root_cause"]["category"] == "bad_llm_output"
+
+
+def test_broken_or_nonsense_judge_never_breaks_analysis(mem):
+    tid = _failed_refund_run(mem)
+
+    def down(prompt):
+        raise OSError("connection refused")
+
+    rep = analyze(mem.trace(tid), mem.blobs, judge=down)
+    assert rep["root_cause"]["detector"] != "llm_judge"
+    rep2 = analyze(mem.trace(tid), mem.blobs, judge=lambda p: "I think step nine maybe")
+    assert all(f["detector"] != "llm_judge" for f in rep2["findings"])
+    rep3 = analyze(mem.trace(tid), mem.blobs, judge=lambda p: '{"step": 999, "category": "wrong_tool"}')
+    assert all(f["detector"] != "llm_judge" for f in rep3["findings"])
+
+
+def test_point_of_no_return_on_outcome_failure(mem):
+    tid = _failed_refund_run(mem)
+    rep = analyze(mem.trace(tid), mem.blobs, judge=None)
+    assert rep["root_cause"]["category"] == "unverified_action" and rep["root_cause"]["step"] == 3

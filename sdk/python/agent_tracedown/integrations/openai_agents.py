@@ -114,7 +114,14 @@ class TracedownProcessor(_Base):  # type: ignore[misc,valid-type]
                 if text:
                     self.last_output[span.trace_id] = text
             elif kind_name == "FunctionSpanData":
+                # the SDK fills in the arguments after the span starts
+                if d.input is not None and t.spans[span.span_id].input_digest is None:
+                    self._input(t, span.span_id, maybe_json(d.input))
                 t.end(span.span_id, output=maybe_json(to_jsonable(d.output)), error=error)
+            elif kind_name == "HandoffSpanData":
+                # the target agent is only known once the handoff resolves
+                t.spans[span.span_id].name = f"handoff {d.from_agent} -> {d.to_agent}"
+                t.end(span.span_id, error=error, **{"tdn.handoff.from": d.from_agent, "tdn.handoff.to": d.to_agent})
             elif kind_name == "GuardrailSpanData":
                 chosen = "tripwire" if d.triggered else "pass"
                 t.end(span.span_id, output=chosen, error=error,

@@ -77,7 +77,11 @@ def _ancestors(start: str, upstream: Dict[str, Set[str]]) -> List[str]:
     return order
 
 
-def analyze(spans: List[Dict[str, Any]], blobs: Dict[str, str]) -> Dict[str, Any]:
+_NO_JUDGE = object()
+
+
+def analyze(spans: List[Dict[str, Any]], blobs: Dict[str, str], judge: Any = _NO_JUDGE) -> Dict[str, Any]:
+    """``judge``: a ``callable(prompt) -> str``; default from ``TDN_JUDGE``; ``None`` disables it."""
     if not spans:
         raise ValueError("run has no spans")
     run = RunView(spans, blobs)
@@ -147,15 +151,31 @@ def analyze(spans: List[Dict[str, Any]], blobs: Dict[str, str]) -> Dict[str, Any
         if f.id in unused:
             f.evidence.append("its output was not used by any later step")
 
+    # When a failed run changed state, what it changed is a likelier cause than how it worded
+    # the final reply: text-only findings rank below action findings.
+    from .detectors import has_side_effects
+    declared = {t.get("name"): t for t in (run.root["attributes"].get("tdn.tools.available") or [])
+                if isinstance(t, dict)}
+    acted = any(s["kind"] == "tool" and s["status"]["code"] != "ERROR" and has_side_effects(s, declared)
+                for s in run.spans)
+
     def score(f: Finding) -> float:
         s = f.confidence * (1.2 if f.id in root_causes else 1.0)
         if f.id in unused:
             s *= 0.6
+        if acted and f.category == "hallucination":
+            s *= 0.7
         if f.symptom and f.caused_by:
             s *= 0.8  # the symptom ranks below what caused it
         return min(s, 0.99)
 
     ranked = sorted(findings, key=lambda f: (-score(f), f.step))
+    judged = _ask_judge(run, ranked, score, judge, len(findings))
+    if judged is not None:
+        findings.append(judged)
+        if judged.confidence > 0:
+            root_causes.add(judged.id)
+        ranked = sorted(findings, key=lambda f: (-score(f), f.step))
     out = [dict(f.as_dict(), score=round(score(f), 3), root_cause=f.id in root_causes) for f in ranked]
     report = {
         "trace_id": run.root["trace_id"],
@@ -199,3 +219,30 @@ def render_stack_trace(report: Dict[str, Any], run: RunView) -> str:
         lines.append("  also:       " + "; ".join(f"{f['label']} (step {f['step']}, {f['confidence']:.2f})" for f in others[:3]))
     lines.append(f"  next:       tracedown replay {report['trace_id'][:8]} --from-step {top['step']}")
     return "\n".join(lines)
+
+
+def _ask_judge(run: RunView, ranked: List[Finding], score, judge: Any, n: int) -> Optional[Finding]:
+    from . import judge as J
+    fn = J.default_judge() if judge is _NO_JUDGE else judge
+    failed = run.root["status"]["code"] == "ERROR" or run.root["attributes"].get("tdn.run.outcome") == "failure"
+    if fn is None or not failed or (ranked and score(ranked[0]) >= J.WEAK):
+        return None
+    cands = [dict(f.as_dict()) for f in ranked]
+    try:
+        verdict = J.parse(fn(J.build_prompt(run, cands)))
+    except Exception as exc:  # noqa: BLE001 - the judge is optional; rules still answer
+        return Finding("other", f"LLM judge unavailable: {type(exc).__name__}", run.root["span_id"], 0, 0.0,
+                       "llm_judge", [str(exc)[:200]])
+    if verdict is None:
+        return None
+    span = next((s for s in run.spans if run.step(s) == verdict["step"]), None)
+    if span is None:
+        return None
+    f = Finding("judged" if verdict["category"] == "other" else verdict["category"],
+                verdict.get("explanation", "")[:300] or "LLM judge verdict", span["span_id"], verdict["step"],
+                min(0.9, 0.6 + 0.3 * verdict["confidence"]), "llm_judge",
+                [f"LLM judge: {verdict.get('explanation', '')[:300]}",
+                 f"judge confidence {verdict['confidence']:.2f}; rule-based top candidate was "
+                 + (f"step {ranked[0].step} ({ranked[0].category})" if ranked else "none")])
+    f.id = f"f{n + 1}"
+    return f

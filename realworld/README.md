@@ -1,0 +1,49 @@
+# Real-world evaluation
+
+The synthetic benchmark (`benchmark/`) tells you whether Tracedown finds failures it was built to find. This folder asks the harder question: on real agent failures, does it point at the right step?
+
+## 1. τ-bench historical failures (no API key needed)
+
+[τ-bench](https://github.com/sierra-research/tau-bench) publishes full trajectories of real models on airline and retail customer-service tasks. Each failed trajectory becomes a Tracedown trace with a mechanical root-cause label. The protocol, including every change made after the first scoring, is fixed in [LABELING.md](LABELING.md).
+
+```bash
+git clone https://github.com/sierra-research/tau-bench ../tau-bench && pip install -e ../tau-bench
+python realworld/tau_bench_import.py --tau-bench ../tau-bench     # dev = GPT-4o, test = Claude 3.5 Sonnet
+python realworld/score.py --split dev                              # tune here
+python realworld/score.py --split test                             # report this, once
+python realworld/score.py --split test --judge openai:gpt-4.1-mini # adds the LLM judge (needs a key)
+```
+
+Held-out test split, 499 failed runs (383 with a single cause step), rules only:
+
+| System | loc@1 | loc@3 | Category agrees |
+|---|---|---|---|
+| **Tracedown** | **65%** | **82%** | 1% |
+| Baseline: first write call | 74% | 74% | 29% |
+| Baseline: last write call | 55% | 55% | 29% |
+| Baseline: last LLM turn | 21% | 21% | 42% |
+| Baseline: first tool error | 13% | 13% | 0% |
+
+What this says: without a model, Tracedown has the right step in its top three 82% of the time, but its first guess is worse than "blame the first state-changing call", and it almost never names the *kind* of mistake. These failures are semantic (the right action with the wrong order or item), which rules cannot see. The LLM judge (`--judge`) exists for that; its numbers will be added once it has been run on test.
+
+**Human check.** `python realworld/label_sheet.py --split test --n 50` writes a sheet and readable transcripts to `realworld/labeling/`. Fill in the `human_*` columns, then `--score realworld/labeling/sheet.csv` reports how often the mechanical label is right and how Tracedown does against human labels.
+
+## 2. Live harnesses around real agent projects (your model, your key)
+
+| Harness | Project | What it checks |
+|---|---|---|
+| [`live/tau_bench_live.py`](live/tau_bench_live.py) | sierra-research/tau-bench | Runs τ-bench live with any LiteLLM model, converts its results with the same rules |
+| [`live/openai_agents_customer_service.py`](live/openai_agents_customer_service.py) | openai/openai-agents-python `examples/customer_service` | 12 scripted customer conversations (seat changes, FAQ, out-of-scope requests), traced through the Agents SDK adapter |
+| [`live/langgraph_sql_agent.py`](live/langgraph_sql_agent.py) | LangGraph `create_react_agent` + Chinook database | 12 questions with gold SQL answers, traced through the LangChain/LangGraph adapter |
+
+```bash
+export OPENAI_API_KEY=...
+python realworld/live/openai_agents_customer_service.py --agents-repo ../openai-agents-python --model gpt-4.1-mini --repeats 3
+python realworld/live/langgraph_sql_agent.py --db ../chinook-database/ChinookDatabase/DataSources/Chinook_Sqlite.sqlite --model openai:gpt-4.1-mini --repeats 3
+python realworld/live/tau_bench_live.py --tau-bench ../tau-bench --env retail --model gpt-4.1-mini --tasks 0-19
+python realworld/score.py --file realworld/data/live-oa-cs-gpt-4.1-mini.jsonl
+```
+
+Add `--endpoint http://localhost:8000` to also send every run to a Tracedown server and look at the failures in the UI. Add `--fake` to check a harness without a key: it swaps in a scripted model with deliberate bugs. Fake-model scores test the plumbing only.
+
+Case files go to `realworld/data/` (gitignored). Each line is one run: `success`, `label` (for failures) and the full trace `bundle`.

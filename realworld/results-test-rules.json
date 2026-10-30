@@ -1,0 +1,174 @@
+{
+  "tracedown": {
+    "cases": 499,
+    "with_step": 383,
+    "localization@1": 0.65,
+    "localization@3": 0.815,
+    "category_agreement@1": 0.01,
+    "detection": 1.0,
+    "per_label": {
+      "called_wrong_tool": {
+        "n": 143,
+        "category_agreement": 0.007,
+        "localized": 116
+      },
+      "goal_partially_completed": {
+        "n": 116,
+        "category_agreement": 0.0,
+        "localized": 0
+      },
+      "missing_output": {
+        "n": 28,
+        "category_agreement": 0.143,
+        "localized": 0
+      },
+      "used_wrong_tool_argument": {
+        "n": 212,
+        "category_agreement": 0.0,
+        "localized": 133
+      }
+    },
+    "top_categories": {
+      "unverified_action": 387,
+      "hallucination": 104,
+      "loop": 7,
+      "wrong_tool": 1
+    }
+  },
+  "baseline: first tool error": {
+    "cases": 499,
+    "with_step": 383,
+    "localization@1": 0.128,
+    "localization@3": 0.128,
+    "category_agreement@1": 0.0,
+    "detection": 0.305,
+    "per_label": {
+      "called_wrong_tool": {
+        "n": 143,
+        "category_agreement": 0.0,
+        "localized": 9
+      },
+      "goal_partially_completed": {
+        "n": 116,
+        "category_agreement": 0.0,
+        "localized": 0
+      },
+      "missing_output": {
+        "n": 28,
+        "category_agreement": 0.0,
+        "localized": 0
+      },
+      "used_wrong_tool_argument": {
+        "n": 212,
+        "category_agreement": 0.0,
+        "localized": 40
+      }
+    },
+    "top_categories": {
+      "reported_failure": 347,
+      "tool_failure": 151,
+      "invalid_tool_args": 1
+    }
+  },
+  "baseline: last LLM turn": {
+    "cases": 499,
+    "with_step": 383,
+    "localization@1": 0.211,
+    "localization@3": 0.211,
+    "category_agreement@1": 0.425,
+    "detection": 1.0,
+    "per_label": {
+      "called_wrong_tool": {
+        "n": 143,
+        "category_agreement": 0.0,
+        "localized": 53
+      },
+      "goal_partially_completed": {
+        "n": 116,
+        "category_agreement": 0.0,
+        "localized": 0
+      },
+      "missing_output": {
+        "n": 28,
+        "category_agreement": 0.0,
+        "localized": 28
+      },
+      "used_wrong_tool_argument": {
+        "n": 212,
+        "category_agreement": 1.0,
+        "localized": 0
+      }
+    },
+    "top_categories": {
+      "bad_llm_output": 499
+    }
+  },
+  "baseline: last write call": {
+    "cases": 499,
+    "with_step": 383,
+    "localization@1": 0.546,
+    "localization@3": 0.546,
+    "category_agreement@1": 0.287,
+    "detection": 0.904,
+    "per_label": {
+      "called_wrong_tool": {
+        "n": 143,
+        "category_agreement": 1.0,
+        "localized": 100
+      },
+      "goal_partially_completed": {
+        "n": 116,
+        "category_agreement": 0.0,
+        "localized": 0
+      },
+      "missing_output": {
+        "n": 28,
+        "category_agreement": 0.0,
+        "localized": 0
+      },
+      "used_wrong_tool_argument": {
+        "n": 212,
+        "category_agreement": 0.0,
+        "localized": 109
+      }
+    },
+    "top_categories": {
+      "wrong_tool": 451,
+      "null": 48
+    }
+  },
+  "baseline: first write call": {
+    "cases": 499,
+    "with_step": 383,
+    "localization@1": 0.739,
+    "localization@3": 0.739,
+    "category_agreement@1": 0.287,
+    "detection": 0.904,
+    "per_label": {
+      "called_wrong_tool": {
+        "n": 143,
+        "category_agreement": 1.0,
+        "localized": 123
+      },
+      "goal_partially_completed": {
+        "n": 116,
+        "category_agreement": 0.0,
+        "localized": 0
+      },
+      "missing_output": {
+        "n": 28,
+        "category_agreement": 0.0,
+        "localized": 0
+      },
+      "used_wrong_tool_argument": {
+        "n": 212,
+        "category_agreement": 0.0,
+        "localized": 160
+      }
+    },
+    "top_categories": {
+      "wrong_tool": 451,
+      "null": 48
+    }
+  }
+}
