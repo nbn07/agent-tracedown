@@ -19,6 +19,19 @@ with tdn.run("CalendarAssistant", input=user_msg) as run:
 
 There is one-line instrumentation for LangGraph, the OpenAI Agents SDK, the Claude Agent SDK, Google ADK, Pydantic AI, MCP, CrewAI, AutoGen, Semantic Kernel and LlamaIndex (`agent_tracedown.integrations`). Runs can also be exported to any OpenTelemetry collector.
 
+## One-line run tracing
+
+For a single-function agent, use `@tdn.traced_run(name)` instead of opening the
+run context yourself. The decorator records the first argument as input, the
+return value as output, and re-raises exceptions after marking the run failed.
+It supports both synchronous and asynchronous functions.
+
+```python
+@tdn.traced_run("CalendarAssistant")
+def answer(question):
+    return call_model(question)
+```
+
 ## Framework integrations
 
 The newer ones, briefly. Each records agents, model calls (with token usage and cost where the framework reports it) and tool calls, and marks the step where a failure happened.
