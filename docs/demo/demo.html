@@ -1,0 +1,327 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Tracedown demo</title>
+<!--
+  The README animation. Every frame is a pure function of time: render(t) draws the
+  frame at t seconds, so `node docs/demo/record.mjs` produces the same video every time.
+  The story and all text come from a real run: examples/demo_agents.py refund_agent,
+  analysed by Tracedown (root cause, fault verdict and claim labels are its real output).
+-->
+<style>
+  :root {
+    --bg: #0b0e13; --panel: #131821; --panel2: #171d28; --line: #263041; --text: #e6edf3; --muted: #8b98a8;
+    --green: #3fb950; --red: #f85149; --amber: #f0a33a; --blue: #58a6ff; --orange: #ff7b39;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; background: var(--bg); }
+  body { font-family: Inter, "DejaVu Sans", sans-serif; color: var(--text); position: relative;
+         background: radial-gradient(1100px 600px at 50% -10%, #17202d 0%, var(--bg) 60%); }
+  .abs { position: absolute; }
+  .mono { font-family: "DejaVu Sans Mono", monospace; }
+
+  /* headline */
+  #h1, #h2 { left: 0; width: 1280px; text-align: center; }
+  #h1 { top: 44px; font: 700 40px/1.15 "Inter Display", Inter, sans-serif; letter-spacing: -0.5px; }
+  #h2 { top: 100px; font: 500 23px/1.3 Inter, sans-serif; color: var(--muted); }
+  .red { color: var(--red); } .green { color: var(--green); } .amber { color: var(--amber); } .orange { color: var(--orange); }
+
+  /* chat */
+  #chat { left: 290px; top: 165px; width: 700px; height: 330px; background: var(--panel); border: 1px solid var(--line);
+          border-radius: 16px; overflow: hidden; }
+  #chat .bar { height: 46px; border-bottom: 1px solid var(--line); display: flex; align-items: center; padding: 0 18px; gap: 10px;
+               color: var(--muted); font-size: 16px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+  .bubble { position: absolute; max-width: 470px; padding: 14px 18px; border-radius: 16px; font-size: 20px; line-height: 1.4; }
+  #u1 { right: 22px; top: 70px; background: #1f6feb; color: #fff; border-bottom-right-radius: 4px; }
+  #a1 { left: 22px; top: 190px; background: var(--panel2); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+  #typing { left: 22px; top: 190px; background: var(--panel2); border: 1px solid var(--line); padding: 16px 18px; border-radius: 16px; }
+  #typing span { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--muted); margin: 0 3px; }
+  .who { font-size: 13px; color: var(--muted); margin-bottom: 4px; font-weight: 600; letter-spacing: .3px; }
+  #stamp { left: 330px; top: 535px; width: 620px; text-align: center; padding: 16px 20px; border: 3px solid var(--red); border-radius: 12px;
+           color: var(--red); font: 800 26px/1.25 "Inter Display", Inter, sans-serif; background: rgba(248,81,73,.08); }
+  #stamp small { display: block; font: 500 17px Inter, sans-serif; color: #ffb3ae; margin-top: 4px; }
+
+  /* step graph */
+  .step { width: 190px; height: 98px; background: var(--panel); border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .step .n { font: 600 13px Inter, sans-serif; color: var(--muted); letter-spacing: .4px; text-transform: uppercase; }
+  .step .t { font: 600 18px/1.25 Inter, sans-serif; margin-top: 4px; }
+  .step .s { font-size: 14px; color: var(--muted); margin-top: 3px; }
+  .step .st { position: absolute; right: 10px; top: 10px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; }
+  .tag { position: absolute; left: 12px; bottom: -13px; font: 700 12px Inter, sans-serif; padding: 3px 8px; border-radius: 999px; letter-spacing: .4px; }
+
+  #answer { left: 790px; top: 352px; width: 400px; background: var(--panel); border: 1.5px solid var(--line); border-radius: 14px; padding: 16px 18px; }
+  #answer .who { margin-bottom: 8px; }
+  #answer .txt { font-size: 19px; line-height: 1.5; }
+  .claim { border-radius: 5px; padding: 1px 0; }
+  .lbl { display: inline-block; font: 700 11px Inter, sans-serif; padding: 2px 7px; border-radius: 999px; margin-left: 4px; vertical-align: 2px; letter-spacing: .4px; }
+
+  #chunks { left: 100px; top: 330px; width: 600px; background: var(--panel); border: 1.5px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+  .chunk { border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; margin-top: 8px; font-size: 15px; line-height: 1.4; background: var(--panel2); }
+  .chunk .src { font-size: 13px; color: var(--muted); margin-bottom: 3px; }
+
+  #rc { left: 100px; top: 540px; width: 1090px; background: linear-gradient(90deg, rgba(255,123,57,.12), rgba(255,123,57,.03));
+        border: 1.5px solid var(--orange); border-radius: 14px; padding: 14px 20px; }
+  #rc .l1 { font: 700 21px Inter, sans-serif; }
+  #rc .ev { font-size: 16px; color: #cdd6e0; margin-top: 6px; line-height: 1.5; }
+  #fault { right: 22px; top: 14px; font: 700 15px Inter, sans-serif; padding: 6px 12px; border-radius: 999px; background: rgba(255,123,57,.18); color: var(--orange); border: 1px solid var(--orange); }
+
+  #code { left: 100px; top: 540px; width: 1090px; background: #0f141b; border: 1.5px solid var(--line); border-radius: 14px; padding: 16px 20px;
+          font: 17px/1.55 "DejaVu Sans Mono", monospace; white-space: pre; }
+  #pulse { width: 22px; height: 22px; border-radius: 50%; background: var(--orange); box-shadow: 0 0 22px 8px rgba(255,123,57,.65); margin: -11px 0 0 -11px; }
+
+  /* web app shot */
+  #shot { left: 210px; top: 150px; width: 860px; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 30px 80px rgba(0,0,0,.6); }
+  #shot img { width: 860px; display: block; }
+
+  /* end card */
+  #end { left: 0; top: 0; width: 1280px; height: 720px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  #end .logo { font: 800 76px "Inter Display", Inter, sans-serif; letter-spacing: -1.5px; }
+  #end .tag1 { font: 600 28px Inter, sans-serif; color: var(--orange); margin-top: 8px; }
+  #end .tag2 { font: 500 20px Inter, sans-serif; color: var(--muted); margin-top: 26px; max-width: 980px; line-height: 1.5; }
+  #end .url { font: 600 24px "DejaVu Sans Mono", monospace; margin-top: 30px; padding: 12px 22px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+  #end .chips { margin-top: 22px; display: flex; gap: 10px; }
+  #end .chip { font: 600 15px Inter, sans-serif; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); color: #cdd6e0; }
+</style>
+</head>
+<body>
+<div id="h1" class="abs"></div>
+<div id="h2" class="abs"></div>
+
+<!-- scene 1: the conversation -->
+<div id="chat" class="abs">
+  <div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span>&nbsp; Support chat · SupportBot</div>
+  <div id="u1" class="bubble"><div class="who" style="color:#cfe2ff">CUSTOMER</div>I cancelled my annual plan after 10 days. How much will I get back?</div>
+  <div id="typing" class="bubble"><span></span><span></span><span></span></div>
+  <div id="a1" class="bubble"><div class="who">SUPPORTBOT</div>You will receive a refund of <b>$120</b>. Refunds are issued to the original payment method within 5 business days.</div>
+</div>
+<div id="stamp" class="abs">Wrong. The policy changed: it's $80.<small>Nothing crashed. Nobody noticed until the customer complained.</small></div>
+
+<!-- scenes 2-4: the run -->
+<svg id="edges" class="abs" width="1280" height="720" style="left:0;top:0;overflow:visible"></svg>
+<div id="steps"></div>
+<div id="chunks" class="abs">
+  <div class="who" style="margin:0">STEP 2 · RETRIEVED FROM help-center</div>
+  <div class="chunk" id="ch1"><div class="src mono" id="ch1src">refund-policy-2023.md · v2023.2</div><span id="ch1txt">Annual plan cancellations within 30 days receive a refund of <b>$120</b>.</span></div>
+  <div class="chunk" id="ch2"><div class="src mono">billing-faq.md · v2026.1</div>Refunds are issued to the original payment method within 5 business days.</div>
+</div>
+<div id="answer" class="abs">
+  <div class="who">FINAL ANSWER · STEP 5</div>
+  <div class="txt" id="anstxt"></div>
+</div>
+<div id="rc" class="abs">
+  <div id="fault" class="abs">At fault: the agent</div>
+  <div class="l1"><span class="orange">Root cause · step 2 · Outdated retrieval source</span> <span style="color:var(--muted);font-weight:500">(confidence 0.80)</span></div>
+  <div class="ev">Retrieved an outdated source: <span class="mono">refund-policy-2023.md (v2023.2)</span><br>
+    1 of 2 chunks marked stale · its output flows into the final answer, where the failure surfaced</div>
+</div>
+<div id="code" class="abs"></div>
+<div id="pulse" class="abs"></div>
+
+<!-- scene 5: web app -->
+<div id="shot" class="abs"><img src="webapp-run.png"></div>
+
+<!-- scene 6: end card -->
+<div id="end" class="abs">
+  <div class="logo">Tracedown</div>
+  <div class="tag1">Find the step that caused it. Replay it with your fix.</div>
+  <div class="tag2">Open source · works without an LLM · on top of the traces you already have</div>
+  <div class="chips">
+    <span class="chip">LangGraph</span><span class="chip">OpenAI Agents</span><span class="chip">Claude Agent SDK</span><span class="chip">CrewAI</span>
+    <span class="chip">Vercel AI SDK</span><span class="chip">Langfuse</span><span class="chip">OpenTelemetry</span>
+  </div>
+  <div class="url">github.com/nbn07/agent-tracedown</div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const ease = x => { x = clamp(x); return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+const out = x => 1 - Math.pow(1 - clamp(x), 3);
+/** 0→1 between t0 and t0+d */
+const ramp = (t, t0, d = .35) => out((t - t0) / d);
+/** visible between a and b, with fades */
+const win = (t, a, b, f = .35) => Math.min(ramp(t, a, f), 1 - ramp(t, b - f, f));
+function show(el, o, dy = 0, scale = 1) {
+  el.style.opacity = o;
+  el.style.transform = `translateY(${(1 - Math.min(1, o)) * dy}px) scale(${scale})`;
+  el.style.visibility = o <= 0.001 ? "hidden" : "visible";
+}
+
+// ---------------------------------------------------------------- the run's steps (real span names)
+const STEPS = [
+  { n: "step 1", t: "ResearchAgent", s: "agent starts" },
+  { n: "step 2", t: "retrieval", s: "help-center · 2 chunks" },
+  { n: "step 3", t: "handoff", s: "→ WriterAgent" },
+  { n: "step 4", t: "WriterAgent", s: "agent starts" },
+  { n: "step 5", t: "chat", s: "claude-haiku-4-5" },
+];
+const X0 = 100, W = 190, GAP = 35, Y = 190;
+const cx = i => X0 + i * (W + GAP);
+const stepEls = STEPS.map((st, i) => {
+  const d = document.createElement("div");
+  d.className = "step abs";
+  d.style.left = cx(i) + "px"; d.style.top = Y + "px";
+  d.innerHTML = `<div class="n">${st.n}</div><div class="t">${st.t}</div><div class="s">${st.s}</div>
+    <div class="st"></div><div class="tag"></div>`;
+  $("steps").appendChild(d);
+  return d;
+});
+const OK = `<svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="11" fill="#3fb950"/><path d="M6 11.5l3.2 3.2L16 8" stroke="#0b0e13" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const BAD = `<svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="11" fill="#ff7b39"/><path d="M11 5.5v7" stroke="#0b0e13" stroke-width="2.8" stroke-linecap="round"/><circle cx="11" cy="16.2" r="1.7" fill="#0b0e13"/></svg>`;
+const LIVE = `<svg width="22" height="22" viewBox="0 0 22 22"><circle cx="11" cy="11" r="11" fill="#58a6ff"/><path d="M8.5 6.5l6 4.5-6 4.5z" fill="#0b0e13"/></svg>`;
+
+// edges: between steps, and step 5 down to the answer
+const svg = $("edges");
+function edge(x1, y1, x2, y2) {
+  const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  p.setAttribute("d", `M${x1} ${y1} L${x2} ${y2}`);
+  p.setAttribute("stroke", "#3a4658"); p.setAttribute("stroke-width", "2.5"); p.setAttribute("fill", "none");
+  p.setAttribute("marker-end", "url(#arr)");
+  svg.appendChild(p); return p;
+}
+svg.innerHTML = `<defs><marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+  <path d="M0 0L10 5L0 10z" fill="#3a4658"/></marker></defs>`;
+const EDGES = [0, 1, 2, 3].map(i => edge(cx(i) + W + 3, Y + 49, cx(i + 1) - 6, Y + 49));
+const ansX = 990, EDGE_ANS = edge(cx(4) + W / 2 + 40, Y + 100, ansX, 345);
+
+// path the "walk back" pulse follows: answer → step 5 → … → step 2
+const PATH = [[ansX, 352], [cx(4) + W / 2 + 40, Y + 98], [cx(4) + W / 2, Y + 49], [cx(3) + W / 2, Y + 49], [cx(2) + W / 2, Y + 49], [cx(1) + W / 2, Y + 49]];
+function along(path, f) {
+  const segs = path.slice(1).map((p, i) => Math.hypot(p[0] - path[i][0], p[1] - path[i][1]));
+  let d = clamp(f) * segs.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < segs.length; i++) {
+    if (d <= segs[i] || i === segs.length - 1) {
+      const r = segs[i] ? d / segs[i] : 0;
+      return [path[i][0] + (path[i + 1][0] - path[i][0]) * r, path[i][1] + (path[i + 1][1] - path[i][1]) * r];
+    }
+    d -= segs[i];
+  }
+}
+
+const ANS_WRONG = `You will receive a refund of <span id="c1" class="claim">$120</span>.<span id="l1"></span>
+  <span id="c2" class="claim">Refunds are issued to the original payment method within 5 business days.</span><span id="l2"></span>`;
+const ANS_RIGHT = `You will receive a refund of <span class="claim" style="background:rgba(63,185,80,.22);color:#7ee787">$80</span>.<span class="lbl" style="background:rgba(63,185,80,.2);color:#7ee787">CORRECT</span>
+  Refunds are issued to the original payment method within 5 business days.`;
+
+const T = { chatEnd: 4.6, s2: 4.6, s3: 8.4, s4: 15.2, s5: 20.4, s6: 23.4, end: 27 };
+const DURATION = T.end;
+
+function heading(a, b) { $("h1").innerHTML = a; $("h2").innerHTML = b; }
+
+function render(t) {
+  // ---------------- headlines
+  let h1 = "", h2 = "", ho = 1;
+  if (t < T.chatEnd) { h1 = "Your AI agent answered a customer."; h2 = "Confidently. Politely. Instantly."; ho = win(t, 0, T.chatEnd); }
+  else if (t < T.s3) { h1 = "Every step of the run succeeded."; h2 = "No error. No crash. So which step was wrong?"; ho = win(t, T.s2, T.s3); }
+  else if (t < T.s4) { h1 = "Tracedown walks back from the answer <span class='orange'>to the cause.</span>";
+    h2 = t < 11.2 ? "It checks every claim in the answer against its sources…" : "…and follows the data back to the step that caused it."; ho = win(t, T.s3, T.s4); }
+  else if (t < T.s5) { h1 = "Replay from that step <span class='green'>with your fix.</span>";
+    h2 = "Swap in the current policy. Steps 2 onward run live, and the answer is right."; ho = win(t, T.s4, T.s5); }
+  else if (t < T.s6) { h1 = "Every run, in the web app."; h2 = "Step graphs, root causes, who was at fault, replays, incidents, cost."; ho = win(t, T.s5, T.s6); }
+  heading(h1, h2);
+  show($("h1"), ho, 8); show($("h2"), ho, 8);
+
+  // ---------------- scene 1: chat
+  const chatO = win(t, 0.05, T.chatEnd);
+  show($("chat"), chatO, 20);
+  show($("u1"), ramp(t, 0.4), 14);
+  show($("typing"), Math.min(ramp(t, 1.15, .2), 1 - ramp(t, 1.85, .15)), 0);
+  if (t > 1.15 && t < 2) $("typing").querySelectorAll("span").forEach((s, i) => s.style.opacity = 0.35 + 0.65 * Math.max(0, Math.sin((t * 7) - i * 0.9)));
+  show($("a1"), ramp(t, 1.95), 14);
+  const st = ramp(t, 2.9, .25);
+  show($("stamp"), Math.min(st, win(t, 2.9, T.chatEnd)), 0, 1.25 - 0.25 * st);
+  $("stamp").style.transform += ` rotate(-3deg)`;
+
+  // ---------------- scenes 2-4: the run
+  const runO = win(t, T.s2, T.s5);
+  stepEls.forEach((el, i) => {
+    const o = Math.min(ramp(t, T.s2 + 0.25 + i * 0.32), runO);
+    show(el, o, 16);
+    const stat = el.querySelector(".st"), tag = el.querySelector(".tag");
+    let border = "var(--line)", glow = "none", icon = "", tagHtml = "", tagStyle = "";
+    if (t > T.s2 + 0.55 + i * 0.32) icon = OK;
+    // walk back: the pulse reaches step 2 at ~11.0s
+    if (i === 1 && t > 11.0 && t < T.s4 + 0.6) { icon = BAD; border = "var(--orange)"; glow = `0 0 ${18 + 8 * Math.sin(t * 6)}px rgba(255,123,57,.55)`;
+      tagHtml = "ROOT CAUSE"; tagStyle = "background:var(--orange);color:#0b0e13"; }
+    // replay: step 1 unchanged; 2..5 run live one by one, then pass
+    if (t >= T.s4 + 0.6) {
+      const k = (t - (T.s4 + 1.6)) / 0.45; // live sweep
+      if (i >= 1) {
+        const j = i - 1;
+        if (k >= j && k < j + 1) { icon = LIVE; border = "var(--blue)"; glow = "0 0 18px rgba(88,166,255,.5)"; tagHtml = "LIVE"; tagStyle = "background:var(--blue);color:#0b0e13"; }
+        else if (k >= j + 1) { icon = OK; border = "var(--green)"; tagHtml = i === 1 ? "FIXED" : "LIVE"; tagStyle = i === 1 ? "background:var(--green);color:#0b0e13" : "background:#1d2a3b;color:var(--blue)"; }
+        else { icon = ""; border = "var(--line)"; }
+      }
+    }
+    stat.innerHTML = icon; el.style.borderColor = border; el.style.boxShadow = glow;
+    tag.innerHTML = tagHtml; tag.style.cssText = tagStyle + (tagHtml ? "" : ";display:none");
+  });
+  EDGES.forEach((e, i) => e.style.opacity = Math.min(ramp(t, T.s2 + 0.5 + i * 0.32), runO));
+  EDGE_ANS.style.opacity = Math.min(ramp(t, T.s2 + 2.1), runO);
+
+  // answer card: appears end of scene 2; claims labelled in scene 3; corrected in scene 4
+  const ansO = Math.min(ramp(t, T.s2 + 2.0), runO);
+  show($("answer"), ansO, 16);
+  const fixedAt = T.s4 + 3.6;
+  const want = t >= fixedAt ? "R" : "W";
+  if ($("anstxt").dataset.v !== want) { $("anstxt").innerHTML = want === "R" ? ANS_RIGHT : ANS_WRONG; $("anstxt").dataset.v = want; }
+  if (want === "W") {
+    const c1 = ramp(t, T.s3 + 0.5, .3), c2 = ramp(t, T.s3 + 1.2, .3);
+    $("c1").style.background = `rgba(240,163,58,${0.28 * c1})`; $("c1").style.color = c1 > .5 ? "#ffcf8a" : "";
+    $("l1").innerHTML = c1 > .05 ? `<span class="lbl" style="opacity:${c1};background:rgba(240,163,58,.22);color:var(--amber)">STALE SOURCE</span>` : "";
+    $("c2").style.background = `rgba(63,185,80,${0.18 * c2})`;
+    $("l2").innerHTML = c2 > .05 ? `<span class="lbl" style="opacity:${c2};background:rgba(63,185,80,.2);color:#7ee787">SUPPORTED</span>` : "";
+  }
+  $("answer").style.borderColor = t >= fixedAt ? "var(--green)" : (t > T.s3 + 0.5 ? "var(--amber)" : "var(--line)");
+  $("answer").style.boxShadow = t >= fixedAt ? `0 0 ${20 * ramp(t, fixedAt, .4)}px rgba(63,185,80,.45)` : "none";
+
+  // pulse walks back from the answer to step 2
+  // claims are labelled at s3+0.5 and s3+1.2; the pulse leaves the answer at s3+1.5 and
+  // reaches step 2 at 11.0, the moment step 2 lights up as the root cause
+  const pf = ease((t - (T.s3 + 1.5)) / (11.0 - (T.s3 + 1.5)));
+  const pulseO = t > T.s3 + 1.45 && t < 11.05 ? 1 : 0;
+  const [px, py] = along(PATH, pf);
+  $("pulse").style.left = px + "px"; $("pulse").style.top = py + "px"; show($("pulse"), pulseO);
+
+  // chunks under step 2: the stale chunk lights up; in replay it becomes the 2026 policy
+  const chO = Math.min(ramp(t, 11.2), runO);
+  show($("chunks"), chO, 14);
+  const fixedChunk = t >= T.s4 + 2.05;
+  $("ch1src").textContent = fixedChunk ? "refund-policy-2026.md · v2026.1" : "refund-policy-2023.md · v2023.2 · STALE";
+  $("ch1txt").innerHTML = fixedChunk ? "Annual plan cancellations within 30 days receive a refund of <b>$80</b>." :
+    "Annual plan cancellations within 30 days receive a refund of <b>$120</b>.";
+  $("ch1").style.borderColor = fixedChunk ? "var(--green)" : (t > 11.5 ? "var(--amber)" : "var(--line)");
+  $("ch1").style.background = fixedChunk ? "rgba(63,185,80,.08)" : (t > 11.5 ? "rgba(240,163,58,.08)" : "var(--panel2)");
+  $("ch1src").style.color = fixedChunk ? "#7ee787" : (t > 11.5 ? "var(--amber)" : "");
+
+  // root-cause card (scene 3) then replay code (scene 4)
+  show($("rc"), win(t, 12.0, T.s4 + 0.2), 18);
+  show($("fault"), Math.min(ramp(t, 13.0, .3), win(t, 12.0, T.s4 + 0.2)), 0, 1.15 - 0.15 * ramp(t, 13.0, .3));
+  const codeO = win(t, T.s4 + 0.1, T.s5);
+  show($("code"), codeO, 18);
+  const L1 = `<span style="color:#8b98a8"># the fix: point the retriever at the current policy, then replay from step 2</span>`;
+  const L2 = `with tdn.replay(bundle, mode="from-step", from_step=2):`;
+  const L3 = `    support_bot(question, retriever=current_policy)`;
+  const L4 = `<span class="green">✓ replayed: steps 2–5 live · answer now matches the 2026 policy ($80)</span>`;
+  const typed = Math.floor(clamp((t - (T.s4 + 0.3)) / 1.1) * (L2.length + L3.length));
+  const a = Math.min(typed, L2.length), b = Math.max(0, typed - L2.length);
+  const cursor = (t * 2 % 1) < .5 ? "▍" : " ";
+  $("code").innerHTML = `${L1}\n<span style="color:#d2a8ff">${L2.slice(0, a)}</span>${a < L2.length ? cursor : ""}\n` +
+    `<span style="color:#e6edf3">${L3.slice(0, b)}</span>${a >= L2.length && t < fixedAt ? cursor : ""}\n${t >= fixedAt + .1 ? L4 : " "}`;
+
+  // ---------------- scene 5: web app screenshot, slow zoom
+  const so = win(t, T.s5, T.s6 + .2, .45);
+  show($("shot"), so, 24, 1 + 0.035 * clamp((t - T.s5) / (T.s6 - T.s5)));
+
+  // ---------------- scene 6: end card
+  const eo = ramp(t, T.s6, .5);
+  show($("end"), eo, 14);
+}
+window.render = render;
+window.DURATION = DURATION;
+render(0);
+</script>
+</body>
+</html>

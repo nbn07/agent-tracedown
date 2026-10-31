@@ -15,7 +15,9 @@
 
 [Quick start](#-quick-start) · [How it compares](#-how-tracedown-compares) · [Benchmarks](#-proof-not-promises) · [Integrations](#-works-with-your-stack) · [Roadmap](#-roadmap) · [Contributing](#-contributing)
 
-<img src="docs/demo.gif" alt="Tracedown finds the step that caused a failure, then replays the run with the fix" width="820">
+<img src="docs/demo.gif" alt="A support agent tells a customer they will get $120 back; the real answer is $80. Every step of the run succeeded. Tracedown flags the $120 claim as coming from a stale source, walks back to step 2 (an outdated refund policy), says the agent was at fault, and replays the run from step 2 with the current policy, which gives $80." width="820">
+
+<sub>A real run from <a href="examples/demo_agents.py"><code>examples/demo_agents.py</code></a>; every verdict shown is Tracedown's actual output. <a href="docs/demo/demo.mp4">Watch in HD</a></sub>
 
 </div>
 
