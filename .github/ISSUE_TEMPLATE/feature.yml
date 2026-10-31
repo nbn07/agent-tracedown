@@ -1,0 +1,22 @@
+name: ✨ Feature or integration request
+description: A new framework, a new failure pattern to detect, or anything else.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The problem first, then the solution you have in mind. A real failing run behind the request gets it prioritised.
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options: [Framework integration, Failure pattern (detector), Web app, Import or export, Deployment, Other]
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Would you like to help build it?
+      options:
+        - label: Yes, I'd like to open a pull request (we'll help you get started)

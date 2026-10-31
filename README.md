@@ -1,89 +1,57 @@
+<div align="center">
+
 # Tracedown
 
-**When an AI agent fails, Tracedown finds the step that caused it, not just the step that crashed. Then you replay the run with your fix.**
+### Your agent said "Booked!" Nothing was booked. Tracedown tells you why.
 
-![Tracedown finds the step that caused a failure, then replays the run with the fix](docs/demo.gif)
+**The open-source flight recorder for AI agents.** It finds the step that *caused* a failure, says whether the agent or the user was at fault, and replays the run with your fix.
 
-Agents fail quietly. A model writes "Friday" where a date belongs. A retriever returns last year's policy. A loop burns 40 tool calls. A run looks fine but books the wrong flight. The error, if there is one, shows up several steps later. Tracedown records every step and walks back from the symptom to the cause:
+[![CI](https://github.com/nbn07/agent-tracedown/actions/workflows/ci.yml/badge.svg)](https://github.com/nbn07/agent-tracedown/actions/workflows/ci.yml)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-3776AB.svg)](sdk/python)
+[![TypeScript](https://img.shields.io/badge/TypeScript-Node%2018%2B-3178C6.svg)](sdk/typescript)
+[![Who&When: 36.5% exact step](https://img.shields.io/badge/Who%26When-36.5%25%20exact%20step-success.svg)](#-proof-not-promises)
+[![No API key needed](https://img.shields.io/badge/demo-no%20API%20key-orange.svg)](#-quick-start)
 
-- **Sits on top of the tracing you already use.** Point it at the failures you already record in **Langfuse**, **Arize Phoenix** or any **OpenTelemetry** exporter, with no code changes. Or add one line to LangGraph, the OpenAI Agents SDK, the Claude Agent SDK, Google ADK, Pydantic AI, MCP, CrewAI, AutoGen, Semantic Kernel, LlamaIndex or the Vercel AI SDK. SDKs for **Python** and **TypeScript**.
-- **Measured, not just claimed.** Its accuracy on a public, human-labelled benchmark is published below, including where a simple rule beats it. Anyone can rerun the scores without an API key.
-- **Works without an LLM.** The diagnosis is rules first: local, instant, free and private. An inexpensive judge model is optional and makes it sharper.
-- **AI stack traces.** Every failed run gets a pasteable report: where it surfaced, what caused it, the evidence, and the step to replay from.
-- **"Who is at fault?"** A verdict on every failed run: the agent, the user, or nobody yet, because many "agent failures" turn out to be the user's.
-- **Replay with a fix.** Earlier steps come from the recording, and from the step you choose onward the agent runs live with your change.
+[Quick start](#-quick-start) · [How it compares](#-how-tracedown-compares) · [Benchmarks](#-proof-not-promises) · [Integrations](#-works-with-your-stack) · [Roadmap](#-roadmap) · [Contributing](#-contributing)
 
-It also shows what each run cost in dollars, with current Anthropic, OpenAI and Google prices built in.
+<img src="docs/demo.gif" alt="Tracedown finds the step that caused a failure, then replays the run with the fix" width="820">
 
-Self-hosted, Apache-2.0, and every feature is free, including the enterprise ones: single sign-on, roles, audit log, PII policies and scale-out storage. There is no paid edition. Neither SDK has any dependencies.
-
-## Try it in a minute
+</div>
 
 ```bash
 git clone https://github.com/nbn07/agent-tracedown && cd agent-tracedown
-pip install ./sdk/python ./server
-
-python examples/run_demo.py          # five agents fail in realistic ways; no API keys, no server
+pip install ./sdk/python ./server && python examples/run_demo.py
 ```
 
-**Already using Langfuse, Phoenix or OpenTelemetry?** Diagnose the runs you have, with no code changes:
+<sub>About 15 seconds on a laptop. Five agents fail in realistic ways and Tracedown diagnoses each one. No API key, no server, no Docker.</sub>
 
-```bash
-export LANGFUSE_PUBLIC_KEY=pk-lf-... LANGFUSE_SECRET_KEY=sk-lf-...   # LANGFUSE_HOST for self-hosted
-tracedown-import langfuse --errors-since 24h       # every run with an error in the last day
-tracedown-import otlp traces.json --failed         # an OTel export (GenAI conventions, OpenInference, OpenLLMetry)
-```
+---
 
-**Want the web app?** It shows runs, an interactive step graph of each run, the agent network, incidents, drift, analytics and a live feed.
+## 😩 The problem
 
-```bash
-tracedown-server --db demo.db                                 # API on http://localhost:7070
-python examples/run_demo.py --endpoint http://localhost:7070
-cd web && npm install && npm run dev                          # http://localhost:3000
-```
+AI agents don't crash. They fail **quietly**:
 
-Or start everything at once: `cd deploy && docker compose up -d`. The web app is at :3000 and the API at :7070.
+- A model writes `"Friday"` where a date belongs. The calendar API rejects it **three steps later**.
+- A retriever returns **last year's refund policy**. The answer sounds confident, and it's wrong.
+- A loop burns **40 tool calls** searching for something that isn't there.
+- The run "succeeds", but books the **wrong flight**.
 
-![Run detail: the AI stack trace, who is at fault, and the step graph with the cause highlighted](web/docs-screenshots/run-detail.png)
+Tracing tools show you all 40 steps. Then **you** have to work out which one broke it. That's like a smoke alarm that tells you the house is full of smoke, but not where the fire started.
 
-## How well does it work?
+## ✨ The solution
 
-We measured it on public benchmarks and published every number, including the ones where Tracedown loses.
+Tracedown is the **detective that reads the recording**. It works in three steps:
 
-**[Who&When](realworld/whowhen/README.md)** (ICML 2025) is the standard benchmark for "which agent, at which step, caused this failure?". It has 184 failed multi-agent runs, labelled by people. Scoring is exact match, run once, with no tuning on this data:
-
-| Found the exact step that caused the failure | Algorithm-generated logs | Hand-crafted logs |
+| 1. Record | 2. Diagnose | 3. Replay |
 |---|---|---|
-| **Tracedown + LLM judge** (Claude Haiku 5.5) | **36.5%** | **20.7%** |
-| Tracedown, rules only (no model) | 21.4% | 19.0% |
-| Simple rule: first failure-looking output | 23.0% | 15.5% |
-| The paper's GPT-4o methods (best in each column) | 16.6% | 8.8% |
+| Every step of every run: model calls, tools, retrievals, memory, hand-offs. Or import the runs you already have in Langfuse, Phoenix or OpenTelemetry | Walks back from the symptom to the **root cause**, shows the evidence, and says **who was at fault**: the agent, or the user | Re-run the failure from the broken step **with your fix**. Earlier steps come from the recording, so nothing gets booked twice |
 
-**[τ-bench](realworld/README.md)**: 499 real customer-service failures. Here a simple rule, "blame the first database change", still beats Tracedown's first guess (74% vs 68%). Tracedown's top three suspects contain the right step 81% of the time. A spot check by a second AI found the benchmark's own labels questionable in about half of a 50-run sample, so we treat these numbers as approximate.
-
-The method, the labelling rules and every change made after the first scoring are in [realworld/LABELING.md](realworld/LABELING.md). The judge's answers are saved in the repo, so anyone can re-check the scores without an API key.
-
-## How Tracedown compares
-
-Automatic diagnosis of agent failures is no longer rare, and several projects below are larger and more polished. Tracedown's aim is narrower: an open, **measured** root-cause layer that works on top of whichever tracing tool you already use. Based on each project's own documentation, October 2026:
-
-| | Open source | Explains why a run failed | Replay from a step with a fix | Published diagnosis accuracy | Works without an LLM |
-|---|---|---|---|---|---|
-| **Tracedown** | Apache-2.0, all features | Yes | Yes | Yes ([Who&When](realworld/whowhen/README.md)) | Yes (LLM judge optional) |
-| [Comet Opik](https://github.com/comet-ml/opik) | Apache-2.0 core | Yes, with a suggested fix | Reruns with the failing inputs | Not published | No |
-| [Laminar](https://laminar.sh) | Yes | Pattern search you describe in plain English | Yes | Not published | Search is LLM-based |
-| [Langfuse](https://langfuse.com) | MIT core | No automatic diagnosis (chat assistant, cloud only) | No | n/a | n/a |
-| [Arize Phoenix](https://github.com/Arize-ai/phoenix) | Elastic License 2.0 | On demand, through an AI assistant | Model calls only | Not published | No |
-| [TraceRoot](https://github.com/traceroot-ai/traceroot) | Apache-2.0 core | Yes, against your source code | No | Not published | No |
-| LangSmith, Arize AX, Galileo | No (commercial) | Yes | Not documented | Not published | No |
-
-Use Tracedown **with** these tools, not instead of them. Keep Langfuse or Phoenix for tracing, prompts and evaluations, and run `tracedown-import` on the failures. If you want a full commercial platform, LangSmith and Arize AX are more complete. Sources: each project's documentation and [Arize's 2026 comparison of agent debugging tools](https://arize.com/resources/best-ai-agent-debugging-tools/). If something here is out of date or wrong, please open an issue and it will be corrected.
-
-## What a report looks like
+Every failed run gets an **AI stack trace** you can paste into an issue:
 
 ```
 AgentFailureException: Invalid tool arguments
-  run      72350035…  CalendarAssistant  2026-10-31 02:22 UTC
+  run      895d4127…  CalendarAssistant  2026-10-31 13:52 UTC
   at        step 5  PlannerAgent → execute_tool calendar_create_event
               start must be ISO-8601 date-time, got 'Friday'
   caused by step 4  PlannerAgent → chat gpt-4o-mini
@@ -94,49 +62,122 @@ AgentFailureException: Invalid tool arguments
   next:       replay from step 4 with your fix: tdn.replay(bundle, mode="from-step", from_step=4)
 ```
 
-When the user, not the agent, caused the failure, the report says so:
+## 🚀 Why developers pick Tracedown
 
+- **🔌 Sits on top of what you already use.** Point it at the runs you already have in Langfuse, Arize Phoenix or any OpenTelemetry exporter, with no code changes. Or add one line to [13 frameworks](#-works-with-your-stack).
+- **📏 Measured, not just claimed.** Its accuracy on a public, human-labelled benchmark is published, including where simple rules beat it, and you can re-check it without an API key.
+- **🧠 Works without an LLM.** The diagnosis is rules first: instant, free, private, and it runs on your laptop. An inexpensive judge model is optional and makes it sharper.
+- **⚖️ "Who is at fault?"** Many "agent failures" are the user's: a wrong order number, an account that doesn't exist. Tracedown gives a verdict on every failed run.
+- **⏪ Replay with a fix.** Swap the prompt, the model or the code, then re-run from the broken step and compare the two runs side by side.
+- **💸 Cost in dollars.** Every run, step, model and agent, with current Anthropic, OpenAI and Google prices built in.
+- **🆓 Everything free.** Apache-2.0, self-hosted, no paid tier, no license key, enterprise features included (SSO, roles, audit log, PII policies, scale-out storage).
+
+## 🥊 How Tracedown compares
+
+Automatic diagnosis of agent failures is no longer rare, and several of the projects below are bigger and more polished. Tracedown's aim is narrower: an **open, measured root-cause layer** that works on top of whichever tracing tool you already use. Based on each project's own documentation, October 2026:
+
+| | Open source | Explains why a run failed | Replay from a step with a fix | Published diagnosis accuracy | Works without an LLM |
+|---|---|---|---|---|---|
+| **Tracedown** | ✅ Apache-2.0, every feature | ✅ | ✅ | ✅ [Who&When](realworld/whowhen/README.md) | ✅ (LLM judge optional) |
+| [Comet Opik](https://github.com/comet-ml/opik) | Apache-2.0 core | ✅ with a suggested fix | Reruns with the failing inputs | Not published | ❌ |
+| [Laminar](https://laminar.sh) | ✅ | Pattern search you describe in plain English | ✅ | Not published | Search is LLM-based |
+| [Langfuse](https://langfuse.com) | MIT core | No automatic diagnosis (chat assistant, cloud only) | ❌ | n/a | n/a |
+| [Arize Phoenix](https://github.com/Arize-ai/phoenix) | Elastic License 2.0 | On demand, through an AI assistant | Model calls only | Not published | ❌ |
+| [TraceRoot](https://github.com/traceroot-ai/traceroot) | Apache-2.0 core | ✅ against your source code | ❌ | Not published | ❌ |
+| LangSmith, Arize AX, Galileo | ❌ commercial | ✅ | Not documented | Not published | ❌ |
+
+**Use Tracedown *with* these tools, not instead of them.** Keep Langfuse or Phoenix for tracing, prompts and evaluations, and run `tracedown-import` on the failures. Sources: each project's documentation and [Arize's 2026 comparison](https://arize.com/resources/best-ai-agent-debugging-tools/). Something out of date? [Open an issue](https://github.com/nbn07/agent-tracedown/issues/new) and it will be corrected.
+
+## 📊 Proof, not promises
+
+**[Who&When](realworld/whowhen/README.md)** (ICML 2025) is the standard benchmark for "which step caused this failure?". It has 184 failed multi-agent runs, labelled by people. Scoring is exact match, run once, with no tuning on this data:
+
+| Found the exact step that caused the failure | Algorithm-generated logs | Hand-crafted logs |
+|---|---|---|
+| **Tracedown + LLM judge** (Claude Haiku 5.5) | **36.5%** | **20.7%** |
+| Tracedown, rules only (no model, free) | 21.4% | 19.0% |
+| Simple rule: first failure-looking output | 23.0% | 15.5% |
+| The paper's GPT-4o methods (best in each column, without ground truth) | 16.6% | 8.8% |
+
+These are honest numbers on a hard problem, losses included:
+- **τ-bench** ([499 real customer-service failures](realworld/README.md)): a simple rule, "blame the first database change", beats Tracedown's first guess (74% vs 68%). Tracedown's top three suspects contain the right step 81% of the time, and the benchmark's own labels looked questionable in about half of a 50-run spot check.
+- **Re-check every number yourself:** the method and every change after the first scoring are in [LABELING.md](realworld/LABELING.md). The judge's answers are saved in the repo, so re-scoring needs no API key.
+
+## ⚡ Quick start
+
+Pick the path that fits. Each one takes under 5 minutes.
+
+### A. See it work (1 minute, nothing to set up)
+
+```bash
+git clone https://github.com/nbn07/agent-tracedown && cd agent-tracedown
+pip install ./sdk/python ./server
+python examples/run_demo.py
 ```
-  fault:      the user, not the agent (0.80): the user's details matched no account: 3 lookups failed and none succeeded
+
+### B. Diagnose the runs you already have (2 minutes, no code changes)
+
+```bash
+export LANGFUSE_PUBLIC_KEY=pk-lf-... LANGFUSE_SECRET_KEY=sk-lf-...   # LANGFUSE_HOST for self-hosted
+tracedown-import langfuse --errors-since 24h        # every run with an error in the last day
+tracedown-import otlp traces.json --failed          # any OpenTelemetry export (GenAI, OpenInference, OpenLLMetry)
 ```
 
-The rules behind the verdict are cautious: they were right both times they blamed the user on a small check, but they catch only a minority of user-caused failures. With an LLM judge (`TDN_JUDGE`), Tracedown finds about half of them, but it is wrong 4 times in 10 when it blames the user. Treat that verdict as a lead to check, not a ruling.
+Sample exports to try are in [`examples/imports/`](examples/imports/).
 
-## Instrument your agent
+### C. Instrument your own agent (3 minutes)
+
+<table>
+<tr><th>Python</th><th>TypeScript</th></tr>
+<tr><td>
 
 ```python
 import agent_tracedown as tdn
-tdn.init(project="support-bot", endpoint="http://localhost:7070", api_key="tdn_...", stream=True)
+tdn.init(project="support-bot",
+         endpoint="http://localhost:7070")
 
-with tdn.run("CalendarAssistant", input=user_msg, prompt_version="extract@v3") as run:
-    run.tools(TOOL_DEFINITIONS)                         # enables the wrong-tool check
-    with tdn.agent("PlannerAgent"):
-        chunks = tdn.retrieval(query, retriever.search, kb_snapshot="kb-2026-10-28")
-        out = tdn.llm_call(call_model, model="gpt-4o-mini", prompt=messages)
-        result = tdn.tool_call("calendar_create_event", args, create_event, schema=SCHEMA)
+with tdn.run("CalendarAssistant", input=msg) as run:
+    out = tdn.llm_call(call_model,
+                       model="gpt-4o-mini",
+                       prompt=messages)
+    tdn.tool_call("create_event", args,
+                  create_event, schema=SCHEMA)
     run.output(answer)
 ```
 
-### TypeScript
-
-```bash
-npm install agent-tracedown
-```
+</td><td>
 
 ```ts
 import * as tdn from "agent-tracedown";
-tdn.init({ project: "support-bot", endpoint: "http://localhost:7070" });
+tdn.init({ project: "support-bot",
+           endpoint: "http://localhost:7070" });
 
-await tdn.run("CalendarAssistant", { input: userMsg }, async run => {
-  const out = await tdn.llmCall(callModel, { model: "gpt-4o-mini", prompt: messages });
-  await tdn.toolCall("calendar_create_event", args, createEvent, { schema: SCHEMA });
-  run.output(answer);
-});
+await tdn.run("CalendarAssistant", { input: msg },
+  async run => {
+    const out = await tdn.llmCall(callModel,
+      { model: "gpt-4o-mini", prompt: messages });
+    await tdn.toolCall("create_event", args,
+      createEvent, { schema: SCHEMA });
+    run.output(answer);
+  });
 ```
 
-The TypeScript SDK records the same data as the Python one, and the same run gets the same diagnosis from either: the tests check this on a real server. See [sdk/typescript](sdk/typescript/README.md).
+</td></tr>
+</table>
 
-### Frameworks
+Both SDKs have no dependencies, record the same data, and get the same diagnosis: the tests check this against a real server.
+
+### D. Open the web app (5 minutes, with Docker)
+
+```bash
+cd deploy && docker compose up -d     # web app on :3000, API on :7070
+```
+
+Or without Docker: `tracedown-server --db demo.db`, then `python examples/run_demo.py --endpoint http://localhost:7070` and `cd web && npm install && npm run dev`.
+
+<p align="center"><img src="web/docs-screenshots/run-detail.png" alt="Run detail: the AI stack trace, who is at fault, and the step graph with the cause highlighted" width="820"></p>
+
+## 🧩 Works with your stack
 
 | Framework | One line |
 |---|---|
@@ -151,68 +192,97 @@ The TypeScript SDK records the same data as the Python one, and the same run get
 | Semantic Kernel | `tdn_sk.instrument(kernel)` |
 | LlamaIndex | `tdn_li.instrument()` |
 | OpenAI / Anthropic clients | `tdn.plugins.instrument("openai", client)` |
-| Vercel AI SDK (TypeScript) | `generateText({ model: traceModel(model), tools: traceTools(tools), ... })` |
-| OpenAI Agents SDK (TypeScript) | `await instrument()` from `agent-tracedown/openai-agents` |
+| Vercel AI SDK (TS) | `generateText({ model: traceModel(model), tools: traceTools(tools), ... })` |
+| OpenAI Agents SDK (TS) | `await instrument()` from `agent-tracedown/openai-agents` |
+| **Already tracing?** | Langfuse, Arize Phoenix / OpenInference, OpenLLMetry, any OTLP exporter: `tracedown-import`, or send OTLP to `POST /v1/traces` |
 
-Python adapters live in `agent_tracedown.integrations` (`langchain`, `openai_agents`, `claude_agent`, `google_adk`, `pydantic_ai`, `mcp`, `crewai`, `autogen`, `semantic_kernel`, `llamaindex`). Each one is tested against the real library: LangGraph 1.2, openai-agents 0.24, claude-agent-sdk 0.2, google-adk 2.13, pydantic-ai 2.64, mcp 1.30 and 2.3, CrewAI 1.15, AutoGen 0.7, Semantic Kernel 1.46 and LlamaIndex 0.14. The TypeScript ones are tested against Vercel AI SDK 5, 6 and 7 and @openai/agents 0.21. Adapters observe the framework. Replay substitutes outputs only for calls that go through `tdn.llm_call` / `tdn.tool_call`, an instrumented model client, or (in TypeScript) a model wrapped with `traceModel`.
+<details>
+<summary>Tested versions and imports</summary>
 
-### Import from Langfuse and OpenTelemetry
+Python adapters live in `agent_tracedown.integrations` (`langchain`, `openai_agents`, `claude_agent`, `google_adk`, `pydantic_ai`, `mcp`, `crewai`, `autogen`, `semantic_kernel`, `llamaindex`). Each one is tested in CI against the real library:
+- LangGraph 1.2, openai-agents 0.24, claude-agent-sdk 0.2, google-adk 2.13, pydantic-ai 2.64;
+- mcp 1.30 and 2.3, CrewAI 1.15, AutoGen 0.7, Semantic Kernel 1.46, LlamaIndex 0.14.
 
-```bash
-tracedown-import langfuse --trace-id 7f3a9c... --failed     # a run a user complained about
-tracedown-import langfuse-file trace.json                    # a trace exported from the Langfuse UI or API
-tracedown-import otlp traces.json --judge anthropic:claude-haiku-5-5
-```
+The TypeScript integrations are tested against Vercel AI SDK 5, 6 and 7 and @openai/agents 0.21.
 
-Everything runs locally by default. The options:
-- `--send http://localhost:7070` also stores the runs in a Tracedown server.
-- `--save runs.jsonl` keeps the converted runs.
-- `--judge` adds the LLM judge.
+Adapters observe the framework. Replay substitutes outputs for calls that go through `tdn.llm_call` / `tdn.tool_call`, an instrumented model client, or (in TypeScript) a model wrapped with `traceModel`.
 
-A Tracedown server also accepts OTLP/JSON at `POST /v1/traces`. Sample exports to try are in [`examples/imports/`](examples/imports/).
+</details>
 
-### Send to your existing observability stack
+Tracedown also **sends** data out: OTLP to Jaeger, Tempo, Datadog or any collector (`tdn.OtlpHttpExporter`, or `TDN_OTLP_FORWARD` on the server), and Prometheus metrics at `/metrics`.
 
-```python
-tdn.init(exporter=tdn.FanoutExporter(tdn.HttpExporter("http://tdn:7070"),
-                                     tdn.OtlpHttpExporter("http://otel-collector:4318/v1/traces")))
-```
+## 🎯 Use cases
 
-The server can do the same for every run (`TDN_OTLP_FORWARD=...`). Prometheus scrapes `/metrics`.
+| You are… | Tracedown helps you… |
+|---|---|
+| **Debugging a failure a user reported** | Paste the run id and get the root cause, the evidence and the step to replay from, instead of reading 40 steps by hand |
+| **Shipping a prompt or model change** | Drift reports compare runs across prompt versions, models, tool schemas or knowledge-base snapshots, and flag what got worse |
+| **On call for an agent in production** | Incidents group runs by root cause with severity and a suggested fix, and notify Slack, PagerDuty or GitHub Issues |
+| **Fighting hallucinations in a RAG app** | Each claim in an answer is linked to its source and labelled supported, partial, stale, unsupported or contradicted |
+| **Running a multi-agent system** | The agent network shows hand-offs and error rates, and the diagnosis names which agent went wrong |
+| **Triaging support escalations** | "Who is at fault?" separates agent bugs from user mistakes before an engineer looks |
+| **Watching spend** | Cost per run, per step, per model and per agent per day, in dollars |
+| **Already on Langfuse or Phoenix** | Keep them. Import the failures and get root causes on top |
 
-## Replay a failure with your fix
+## 📚 Examples
+
+| Example | What it shows |
+|---|---|
+| [`examples/run_demo.py`](examples/run_demo.py) | Five agents that fail in realistic ways (bad model output, stale source, loop, hallucination, wrong tool), plus a prompt-drift cohort |
+| [`examples/demo_agents.py`](examples/demo_agents.py) | The agents themselves: a good template for instrumenting your own |
+| [`sdk/typescript/examples/demo.ts`](sdk/typescript/examples/demo.ts) | The same agents in TypeScript |
+| [`examples/imports/`](examples/imports/) | Sample Langfuse and OpenTelemetry exports to try `tracedown-import` on |
+| [`realworld/`](realworld/) | Real failures from public benchmarks, with the scripts that score Tracedown on them |
+
+**Replay a failure with your fix:**
 
 ```python
 bundle = tdn.fetch_bundle("http://localhost:7070", trace_id)
 with tdn.replay(bundle, mode="from-step", from_step=4):
-    calendar_agent(extractor=fixed_extractor)     # earlier steps replay from the recording
+    calendar_agent(extractor=fixed_extractor)   # steps 0-3 come from the recording; step 4 on runs live
 ```
 
-Open `#/diff/<original>/<replay>` in the UI for the step-by-step comparison. The replay modes:
-- `exact`: everything replays from the recording;
-- `from-step`: the recording up to a step, then the agent runs live;
-- `swap`: a new model or prompt;
-- `full`: everything runs live.
+Modes: `exact` (everything from the recording), `from-step`, `swap` (a new model or prompt) and `full` (everything live). The web app shows the two runs side by side.
 
-## Everything in the box
+## 🏗️ Architecture
 
-| Capability | What you get |
-|---|---|
-| **Execution tracing** | Every step as OpenTelemetry-compatible spans: agent, LLM, tool, retrieval, memory, decision, handoff. Payloads are stored once, by content hash |
-| **AI stack traces** | A pasteable report for every failed run |
-| **Root-cause engine** | 9 detectors and a data-flow walk back to the earliest step whose output caused the failure. Optional LLM judge for the semantic cases |
-| **Who is at fault** | A verdict for each failed run: agent, user, or unfinished |
-| **Replay** | Exact, from a step, with a swapped model or prompt, or fully live. Recorded tool, retrieval and memory outputs are fed back, with a side-by-side diff |
-| **Hallucination investigator** | Each claim in an answer is linked to its source and labelled supported, partial, stale, unsupported or contradicted |
-| **Drift detection** | Compares runs across prompt versions, models, tool schemas or knowledge-base snapshots, and writes a report automatically |
-| **Web app** | Next.js: runs, an interactive step graph of each run with the cause highlighted, payloads, claims, replay, run comparison; light and dark themes |
-| **Multi-agent views** | Agent networks with handoffs and error rates, and a live span stream |
-| **Incidents** | Runs grouped by root cause, with severity, timeline and suggested fix. Notifications to Slack, PagerDuty, GitHub Issues or a webhook |
-| **Analytics** | Success rate, latency, tokens and cost per task, tool reliability, retrieval effectiveness, user feedback |
-| **OpenTelemetry for AI** | `gen_ai.*` conventions in and out. Importers for Langfuse, OpenInference and OpenLLMetry |
-| **Enterprise** | RBAC, OIDC single sign-on, hash-chained audit log, PII policies, Kafka/Redpanda ingest, multi-cluster ClickHouse |
+```mermaid
+flowchart LR
+    subgraph sources["① Your agents and traces"]
+        direction TB
+        py["Python SDK<br/>+ 10 framework adapters"]
+        ts["TypeScript SDK<br/>Vercel AI SDK · OpenAI Agents"]
+        imp["tracedown-import<br/>Langfuse · Phoenix · OTLP"]
+    end
 
-## Deploy
+    subgraph server["② Tracedown server"]
+        direction TB
+        api["Ingest API"]
+        q[("Kafka<br/>optional, at scale")]
+        pipe["Analysis<br/>root cause · who is at fault<br/>claims · drift · incidents · cost"]
+        judge["LLM judge<br/>optional"]
+        api --> q --> pipe
+        api -- small setups --> pipe
+        pipe -.-> judge
+    end
+
+    subgraph storage["③ Storage"]
+        direction TB
+        meta[("SQLite or Postgres")]
+        spans[("ClickHouse<br/>optional, at scale")]
+        cache[("Redis<br/>optional")]
+    end
+
+    web["④ Web app<br/>Next.js · React Flow"]
+    out["Alerts and exports<br/>Slack · PagerDuty · GitHub<br/>OTLP · Prometheus"]
+
+    sources --> api
+    pipe --> storage
+    storage --> web
+    pipe --> out
+```
+
+It starts as **one process on SQLite** and grows with you:
 
 | Layout | Metadata | Spans | Ingest | For |
 |---|---|---|---|---|
@@ -221,69 +291,79 @@ Open `#/diff/<original>/<replay>` in the UI for the step-by-step comparison. The
 | Scale (Compose `--profile scale` or Helm) | Postgres | ClickHouse, one or more clusters routed by project | Kafka + workers | high span volume, data residency |
 
 ```bash
-helm install tracedown deploy/helm/tracedown                       # server, worker, web, Postgres, Redis
-helm install tracedown deploy/helm/tracedown \
-  --set redpanda.enabled=true,clickhouse.enabled=true,ingress.enabled=true   # the scale layout
+helm install tracedown deploy/helm/tracedown     # add --set redpanda.enabled=true,clickhouse.enabled=true for the scale layout
 ```
 
-You can bring your own Postgres, Redis, Kafka and ClickHouse instead. The chart also covers autoscaling, disruption budgets, network policies and non-root containers. Details are in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+Guides: [Deployment](docs/DEPLOYMENT.md) · [Configuration](docs/CONFIGURATION.md) · [Design](docs/DESIGN.md) · [Telemetry spec](spec/)
 
-> **Status: v0.3, beta.** About 100 unit tests run on both SQLite and Postgres, including the framework adapters against the real libraries. Integration tests run against Kafka, two ClickHouse clusters and Postgres. A full-stack test ([`deploy/e2e/stack.py`](deploy/e2e/stack.py)) runs the whole system (Postgres, Redis, a Kafka-protocol broker, two ClickHouse clusters, two API processes, two workers and the web app), sends real agent runs through it and checks every page in a browser. Design: [docs/DESIGN.md](docs/DESIGN.md).
+<details>
+<summary>📸 More screenshots</summary>
 
-## License
-
-Everything in this repository is Apache-2.0: the SDK, the server, the root-cause engine and judge, the importers, the web viewer and the enterprise features. There is no paid tier, no feature held back, and no license key. Use it at work, change it and ship it. Contributions are welcome under the same license (see [CONTRIBUTING.md](CONTRIBUTING.md)).
-
-## Configuration
-
-| Variable | Purpose |
+| | |
 |---|---|
-| `TDN_DB` | SQLite path for metadata (single-process setups) |
-| `TDN_DATABASE_URL` | Postgres for metadata, e.g. `postgresql://user:pass@host/tracedown` (`TDN_DATABASE_POOL` connections per process) |
-| `TDN_REDIS_URL` | Redis: shared read cache, live feed across replicas, ingest rate limits (`TDN_CACHE_TTL`, `TDN_INGEST_RATE_LIMIT`) |
-| `TDN_API_KEYS` | Bootstrap owner keys (comma-separated). Without keys, users or this, the server runs open (dev) |
-| `TDN_AUTH=required` | Refuse open mode even on a fresh install |
-| `TDN_JUDGE` | Optional LLM judge, e.g. `anthropic:claude-haiku-5-5` or `openai:gpt-4.1-mini` (uses `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`) |
-| `TDN_OIDC_ISSUER`, `_CLIENT_ID`, `_CLIENT_SECRET`, `_REDIRECT_URI`, `_ROLE_MAP`, `_ALLOWED_DOMAINS` | Single sign-on |
-| `TDN_SESSION_SECRET` | Signs SSO session cookies (set it in production) |
-| `TDN_CLICKHOUSE` | ClickHouse URL, or JSON router config for multi-cluster |
-| `TDN_KAFKA_BOOTSTRAP` | Ingest through Kafka/Redpanda; run `tracedown-worker`. The topic is created if missing (`TDN_KAFKA_PARTITIONS`, default 12) |
-| `TDN_OTLP_FORWARD`, `TDN_OTLP_HEADERS` | Forward finished runs to an OTLP endpoint |
-| `TDN_PRICES` | Extra or corrected model prices, USD per million tokens, as JSON or a path to a JSON file: `{"model": {"input": .., "output": ..}}`. Current Anthropic, OpenAI and Google models are priced out of the box ([sources](server/tracedown_server/pricing.py)) |
-| `TDN_DRIFT_MIN_RUNS` | Runs per cohort before a drift report (default 20) |
-| `TDN_PUBLIC_URL` | Used in notification links and the cookie `secure` flag |
+| ![Runs](web/docs-screenshots/runs.png) | ![Agent network](web/docs-screenshots/network.png) |
+| **Runs**, with root cause, fault and cost | **Agent network** with hand-offs and error rates |
+| ![Incidents](web/docs-screenshots/incidents.png) | ![Analytics](web/docs-screenshots/analytics.png) |
+| **Incidents** grouped by root cause | **Analytics**: success, latency, cost, tool reliability |
+| ![Replay diff](web/docs-screenshots/diff.png) | ![Claims](web/docs-screenshots/run-claims.png) |
+| **Replay diff**: the original run and the fix | **Claims**: each sentence checked against its source |
 
+</details>
 
-## Repository
+## 🗺️ Roadmap
 
-```
-spec/                 TDN telemetry spec (JSON Schema)
-sdk/python/           Python SDK: tracer, exporters, plugins, framework integrations, redaction
-sdk/typescript/       TypeScript SDK: same data and replay; Vercel AI SDK and OpenAI Agents integrations
-server/tracedown_server/    API, pipeline, rca/, claims/, drift/, incidents/, importers/, storage/ (SQLite, Postgres), cache (Redis), enterprise/
-web/                  Next.js web app (React, Tailwind, React Flow, Recharts)
-benchmark/            TDN-RCA-Bench: synthetic generator, data, scorer
-realworld/            evaluation on real failures: Who&When, τ-bench, live harnesses, label checks
-docs/                 design, standards proposal (OTel GenAI SIG)
-deploy/               Dockerfiles, Compose (standard / scale), Helm chart, SQL DDL, full-stack test (e2e/)
-examples/             demo agents, the end-to-end demo, sample OTel/Langfuse exports (imports/)
-```
+**Shipped in v0.3:** Python and TypeScript SDKs · 13 framework integrations · Langfuse and OTel import · root-cause engine with an optional LLM judge · "who is at fault" · replay · claims checking · drift · incidents · dollar costs · web app · Postgres, Redis, Kafka, ClickHouse, Helm.
 
-## Standards
+**Next:**
 
-[docs/standards/otel-genai-proposal.md](docs/standards/otel-genai-proposal.md) proposes three things to the OpenTelemetry GenAI SIG, building on the in-flight memory and durable-execution work:
-- decision spans;
-- replay provenance with content digests;
-- two memory consistency fields.
+- [ ] **`pip install` and `npm install`** from PyPI and npm (packaging is done; publishing is next)
+- [ ] **Hosted demo**: click around without installing anything
+- [ ] **Proven fixes**: suggest a fix, replay the run with it, and show that it now passes
+- [ ] **MCP server**: ask "why did run X fail?" from Claude Code, Cursor or any MCP client
+- [ ] **GitHub Action**: run your agent's test conversations on every pull request and block the merge with the root cause
+- [ ] **Write-back to Langfuse and Phoenix**: see Tracedown's verdict inside the tool you already use
+- [ ] **"Was this diagnosis right?" button**: every answer becomes a new label, so accuracy improves with use
+- [ ] **Login and team admin screens** in the web app
+- [ ] **More benchmarks**: TRAIL, and results on your real failures
 
-## Development
+Something missing? [Open an issue](https://github.com/nbn07/agent-tracedown/issues/new/choose). Requests with a real failing run behind them get priority.
+
+## 🤝 Contributing
+
+Tracedown gets better with every failure it sees. The most valuable contributions are, in order:
+
+1. **🐛 A run we diagnose wrongly.** [Report a wrong diagnosis](https://github.com/nbn07/agent-tracedown/issues/new?template=wrong-diagnosis.yml) with the run (redacted) and what really went wrong. Each one becomes a benchmark case, so every later version is tested against it.
+2. **🔍 A detector** for a failure pattern we miss: one function in [`rca/detectors.py`](server/tracedown_server/rca/detectors.py), plus a demo agent that triggers it.
+3. **🧩 A framework adapter**: copy the nearest one in [`integrations/`](sdk/python/agent_tracedown/integrations/) and test it against the real library.
+4. **📝 Docs and examples**: a tutorial for your stack helps the next person more than you'd think.
 
 ```bash
-pip install -e ./sdk/python -e "./server[dev]"
-pytest                                     # core
-python benchmark/score.py --split holdout  # synthetic RCA benchmark
-python realworld/whowhen/score.py          # Who&When (after realworld/whowhen/convert.py)
-cd sdk/typescript && npm install && npm test # TypeScript SDK, incl. end-to-end against the server
+pip install -e ./sdk/python -e "./server[dev]" && pytest     # about 150 tests, ~15 seconds
+cd sdk/typescript && npm install && npm test                  # TypeScript SDK, incl. end-to-end against the server
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Apache-2.0.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) for the ground rules and repo layout. First time contributing to open source? Issues labelled [`good first issue`](https://github.com/nbn07/agent-tracedown/labels/good%20first%20issue) are a friendly place to start.
+
+## 💬 Community
+
+- **⭐ Star the repo** if Tracedown saved you a debugging session. It's the simplest way to help others find it.
+- **🐛 [Issues](https://github.com/nbn07/agent-tracedown/issues)** for bugs, wrong diagnoses and feature requests.
+- **📣 Using Tracedown?** Add your project or company to the list below with a pull request, and show it off with a badge:
+
+```markdown
+[![Debugged with Tracedown](https://img.shields.io/badge/debugged%20with-Tracedown-6E56CF)](https://github.com/nbn07/agent-tracedown)
+```
+
+[![Debugged with Tracedown](https://img.shields.io/badge/debugged%20with-Tracedown-6E56CF)](https://github.com/nbn07/agent-tracedown)
+
+**Who uses Tracedown:** *your project here. [Add it](https://github.com/nbn07/agent-tracedown/edit/main/README.md).*
+
+## 📜 License
+
+**Apache-2.0, all of it**: the SDKs, the server, the root-cause engine and judge, the importers, the web app and the enterprise features. There is no paid tier, no feature held back and no license key. Use it at work, change it, ship it.
+
+Tracedown also proposes [three additions to the OpenTelemetry GenAI conventions](docs/standards/otel-genai-proposal.md) (decision spans, replay provenance, memory consistency), so the ideas here can become standard for every tool.
+
+<div align="center">
+<sub>Built for everyone who has stared at a 40-step trace wondering which step broke it.</sub>
+</div>

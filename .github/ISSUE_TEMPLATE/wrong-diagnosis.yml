@@ -1,0 +1,37 @@
+name: 🎯 Wrong diagnosis
+description: Tracedown blamed the wrong step, the wrong agent, or the wrong party. These become benchmark cases.
+title: "Wrong diagnosis: "
+labels: ["wrong-diagnosis"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you. Every wrong diagnosis you report becomes a test case, so later versions are checked against it.
+        **Please remove secrets and personal data first.** `tdn.init(redact=tdn.redaction.default_redactor)` removes emails, API keys, card and phone numbers.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What really went wrong?
+      description: In plain words. Which step or agent caused the failure, and why?
+      placeholder: Step 4 picked the wrong customer record; the tool error at step 7 was only a symptom.
+    validations:
+      required: true
+  - type: textarea
+    id: tracedown-said
+    attributes:
+      label: What did Tracedown say?
+      description: Paste the AI stack trace (from the web app, the CLI, or `GET /api/v1/runs/{id}`).
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: bundle
+    attributes:
+      label: The run (optional but very helpful)
+      description: The redacted bundle from `GET /api/v1/runs/{id}/bundle`. Attach it as a .json file, or paste it here.
+      render: json
+  - type: input
+    id: framework
+    attributes:
+      label: Framework and Tracedown version
+      placeholder: LangGraph 1.2, agent-tracedown 0.3.0, LLM judge on/off

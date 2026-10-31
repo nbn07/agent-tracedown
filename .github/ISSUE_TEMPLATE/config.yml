@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 📖 Read the docs
+    url: https://github.com/nbn07/agent-tracedown#-quick-start
+    about: Quick start, integrations, deployment and configuration.
