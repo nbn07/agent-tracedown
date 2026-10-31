@@ -1,65 +1,98 @@
-# Profiles
-#   dev (default)  docker compose -f deploy/docker-compose.yml up
-#                  one container: API + UI + pipeline, SQLite
-#   standard       TDN_CLICKHOUSE=http://clickhouse:8123 \
-#                  docker compose -f deploy/docker-compose.yml --profile standard up
-#                  spans in ClickHouse, metadata in SQLite
-#   scale          TDN_CLICKHOUSE=http://clickhouse:8123 TDN_KAFKA_BOOTSTRAP=redpanda:9092 \
-#                  docker compose -f deploy/docker-compose.yml --profile scale up --scale tracedown-worker=3
-#                  API publishes to Redpanda; workers run the pipeline; spans in ClickHouse
+# Tracedown full stack.
 #
-# Metadata (runs, findings, incidents, users) is SQLite in every profile today. With
-# several workers it is the bottleneck; the Postgres store (DDL in sql/postgres.sql) is the
-# next storage milestone. Run one API replica until then.
+#   standard (default)   docker compose -f deploy/docker-compose.yml up --build
+#                        API server, web app, Postgres (metadata), Redis (cache + live feed)
+#   scale                docker compose -f deploy/docker-compose.yml --profile scale up --build --scale tracedown-worker=3
+#                        + Redpanda (Kafka API), ClickHouse (spans) and pipeline workers
+#
+# Web app: http://localhost:3000   API: http://localhost:7070   (set TDN_API_KEYS to require keys)
+# Single container, no services at all:  docker run -p 7070:7070 <image built from deploy/Dockerfile>
+
 x-tdn: &tdn
   build: { context: .., dockerfile: deploy/Dockerfile }
-  volumes: ["tdn-data:/data"]
+  image: tracedown-server:local
+  restart: unless-stopped
   environment: &tdn-env
-    TDN_API_KEYS: ${TDN_API_KEYS:-}            # comma-separated bootstrap keys; empty = open (dev only)
+    TDN_DATABASE_URL: postgresql://tdn:${POSTGRES_PASSWORD:-tdn}@postgres:5432/tdn
+    TDN_REDIS_URL: redis://redis:6379/0
+    TDN_API_KEYS: ${TDN_API_KEYS:-}               # comma-separated bootstrap keys; empty = open (dev only)
     TDN_SESSION_SECRET: ${TDN_SESSION_SECRET:-change-me}
-    TDN_PUBLIC_URL: ${TDN_PUBLIC_URL:-http://localhost:7070}
-    TDN_OIDC_ISSUER: ${TDN_OIDC_ISSUER:-}       # SSO: set issuer, client id/secret, redirect URI, role map
+    TDN_PUBLIC_URL: ${TDN_PUBLIC_URL:-http://localhost:3000}
+    TDN_JUDGE: ${TDN_JUDGE:-}                     # e.g. anthropic:claude-haiku-5-5 (+ ANTHROPIC_API_KEY)
+    ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    TDN_OIDC_ISSUER: ${TDN_OIDC_ISSUER:-}         # SSO: issuer, client id/secret, redirect URI, role map
     TDN_OIDC_CLIENT_ID: ${TDN_OIDC_CLIENT_ID:-}
     TDN_OIDC_CLIENT_SECRET: ${TDN_OIDC_CLIENT_SECRET:-}
     TDN_OIDC_REDIRECT_URI: ${TDN_OIDC_REDIRECT_URI:-}
     TDN_OIDC_ROLE_MAP: ${TDN_OIDC_ROLE_MAP:-{}}
-    TDN_OTLP_FORWARD: ${TDN_OTLP_FORWARD:-}      # e.g. http://otel-collector:4318/v1/traces
-    TDN_CLICKHOUSE: ${TDN_CLICKHOUSE:-}          # standard/scale: http://clickhouse:8123
-    TDN_KAFKA_BOOTSTRAP: ${TDN_KAFKA_BOOTSTRAP:-}  # scale: redpanda:9092
+    TDN_OTLP_FORWARD: ${TDN_OTLP_FORWARD:-}
+    # scale profile: export these two before `up`
+    TDN_KAFKA_BOOTSTRAP: ${TDN_KAFKA_BOOTSTRAP:-}   # redpanda:9092
+    TDN_CLICKHOUSE: ${TDN_CLICKHOUSE:-}             # http://clickhouse:8123
+  depends_on:
+    postgres: { condition: service_healthy }
+    redis: { condition: service_healthy }
 
 services:
   tdn:
     <<: *tdn
     ports: ["7070:7070"]
 
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/web.Dockerfile
+      args: { TDN_API_URL: "http://tdn:7070" }
+    image: tracedown-web:local
+    restart: unless-stopped
+    environment: { TDN_API_URL: "http://tdn:7070" }
+    ports: ["3000:3000"]
+    depends_on: [tdn]
+
   tracedown-worker:
     <<: *tdn
     profiles: ["scale"]
-    command: ["tracedown-worker"]
-    depends_on: [redpanda, clickhouse]
+    command: ["tracedown-worker", "--health-port", "8081"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      redpanda: { condition: service_healthy }
+      clickhouse: { condition: service_healthy }
 
-  clickhouse:
-    profiles: ["standard", "scale"]
-    image: clickhouse/clickhouse-server:24.8
-    environment: { CLICKHOUSE_SKIP_USER_SETUP: "1" }
-    ports: ["8123:8123"]
-    volumes: ["ch-data:/var/lib/clickhouse"]
+  postgres:
+    image: postgres:16.4
+    restart: unless-stopped
+    environment: { POSTGRES_USER: tdn, POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-tdn}", POSTGRES_DB: tdn }
+    volumes: ["pg-data:/var/lib/postgresql/data"]
+    healthcheck: { test: ["CMD", "pg_isready", "-U", "tdn"], interval: 5s, retries: 20 }
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "allkeys-lru"]
+    volumes: ["redis-data:/data"]
+    healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 5s, retries: 20 }
 
   redpanda:
     profiles: ["scale"]
     image: redpandadata/redpanda:v24.2.7
     command: ["redpanda", "start", "--overprovisioned", "--smp", "1", "--memory", "1G",
-              "--kafka-addr", "PLAINTEXT://0.0.0.0:9092", "--advertise-kafka-addr", "PLAINTEXT://redpanda:9092"]
-    ports: ["9092:9092"]
+              "--kafka-addr", "PLAINTEXT://0.0.0.0:9092", "--advertise-kafka-addr", "PLAINTEXT://redpanda:9092",
+              "--set", "redpanda.auto_create_topics_enabled=true", "--set", "redpanda.default_topic_partitions=12"]
+    volumes: ["rp-data:/var/lib/redpanda/data"]
+    healthcheck: { test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"], interval: 5s, retries: 30 }
 
-  postgres:                                    # schema only, for the upcoming Postgres metadata store
-    profiles: ["postgres"]
-    image: postgres:16.4
-    environment: { POSTGRES_USER: tdn, POSTGRES_PASSWORD: tdn, POSTGRES_DB: tdn }
-    volumes: ["./sql/postgres.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro", "pg-data:/var/lib/postgresql/data"]
-    ports: ["5432:5432"]
+  clickhouse:
+    profiles: ["scale"]
+    image: clickhouse/clickhouse-server:24.8
+    environment: { CLICKHOUSE_SKIP_USER_SETUP: "1" }
+    volumes: ["ch-data:/var/lib/clickhouse"]
+    ulimits: { nofile: { soft: 262144, hard: 262144 } }
+    healthcheck: { test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8123/ping"], interval: 5s, retries: 30 }
 
 volumes:
-  tdn-data:
-  ch-data:
   pg-data:
+  redis-data:
+  rp-data:
+  ch-data:

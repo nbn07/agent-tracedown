@@ -45,7 +45,8 @@ def set_prices(store, prices: Dict[str, Dict[str, float]]) -> Dict[str, Dict[str
         if not {"input", "output"} <= set(p) or any(not isinstance(p[k], (int, float)) or p[k] < 0
                                                      for k in ("input", "output")):
             raise ValueError(f"{model}: need non-negative 'input' and 'output' USD per million tokens")
-    store.execute("INSERT OR REPLACE INTO settings VALUES ('prices', ?)", (json.dumps(prices),))
+    store.execute("INSERT INTO settings(key, value) VALUES ('prices', ?) "
+                  "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (json.dumps(prices),))
     return prices
 
 

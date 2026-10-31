@@ -499,3 +499,17 @@ def test_fault_llm_judge_overrides_weak_rules(mem):
     f = analyze(mem.trace(tid), mem.blobs, judge=judge)["fault"]
     assert f["verdict"] == "user" and f["source"] == "llm_judge" and f["rules"]["verdict"] == "agent"
     assert any("TOOL cancel_order" in p for p in calls)
+
+
+def test_runs_list_carries_fault_verdict_and_facets_list_filters(env):
+    client, mem, _, app = env
+    tdn.init(project="demo", exporter=mem)
+    with tdn.run("FacetBot", input="hi") as run:
+        tdn.tool_call("t", {"a": 1}, lambda a: a)
+        run.fail("customer: wrong answer")
+    push(client, mem)
+    row = next(r for r in client.get("/api/v1/runs").json()["runs"] if r["trace_id"] == run.trace_id)
+    assert row["fault"] and row["fault"]["verdict"] in ("agent", "user", "unfinished", "unclear")
+    f = client.get("/api/v1/facets").json()
+    assert "demo" in f["projects"] and "FacetBot" in f["agents"]
+    assert client.get("/api/v1/facets?project=nope").json()["agents"] == []

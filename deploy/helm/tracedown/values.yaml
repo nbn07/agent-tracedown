@@ -1,0 +1,147 @@
+# Tracedown Helm values.
+#
+# Two ways to run the data services:
+#   bundled   postgresql/redis/redpanda/clickhouse.enabled=true: single-node StatefulSets in
+#             this release. Good for evaluation and small teams; no replication or backups.
+#   external  set the *.enabled flags to false and give URLs under `external` (managed Postgres,
+#             ElastiCache/Memorystore, MSK/Confluent/Redpanda Cloud, ClickHouse Cloud or the
+#             Altinity operator). Recommended for production.
+
+image:
+  repository: ghcr.io/nbn07/agent-tracedown        # server and worker (deploy/Dockerfile)
+  tag: ""                                          # defaults to .Chart.AppVersion
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+server:
+  replicas: 2
+  port: 7070
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { memory: 2Gi }
+  autoscaling: { enabled: true, minReplicas: 2, maxReplicas: 10, targetCPUUtilizationPercentage: 70 }
+  podDisruptionBudget: { enabled: true, minAvailable: 1 }
+  extraEnv: []
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+worker:
+  # Kafka consumers that run the analysis pipeline. Only deployed when Kafka is configured
+  # (redpanda.enabled or external.kafkaBootstrap); otherwise the API processes spans inline.
+  replicas: 2
+  healthPort: 8081
+  group: tdn-pipeline
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { memory: 2Gi }
+  # Workers beyond the topic's partition count sit idle: keep maxReplicas <= partitions.
+  autoscaling: { enabled: true, minReplicas: 2, maxReplicas: 12, targetCPUUtilizationPercentage: 70 }
+  podDisruptionBudget: { enabled: true, minAvailable: 1 }
+  extraEnv: []
+
+web:
+  enabled: true
+  image:
+    repository: ghcr.io/nbn07/agent-tracedown-web  # Next.js app (deploy/web.Dockerfile)
+    tag: ""
+    pullPolicy: IfNotPresent
+  replicas: 2
+  port: 3000
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { memory: 1Gi }
+  autoscaling: { enabled: false, minReplicas: 2, maxReplicas: 6, targetCPUUtilizationPercentage: 70 }
+  podDisruptionBudget: { enabled: true, minAvailable: 1 }
+
+ingress:
+  enabled: false
+  className: ""                 # e.g. nginx
+  host: tracedown.example.com
+  annotations: {}
+  tls: []                       # [{ secretName: tracedown-tls, hosts: [tracedown.example.com] }]
+
+config:
+  publicUrl: ""                 # TDN_PUBLIC_URL; defaults to https://<ingress.host> when ingress is on
+  judge: ""                     # TDN_JUDGE, e.g. anthropic:claude-haiku-5-5
+  otlpForward: ""               # TDN_OTLP_FORWARD
+  driftMinRuns: 20
+  prices: ""                    # TDN_PRICES JSON
+  clickhouseCluster: ""         # TDN_CLICKHOUSE_CLUSTER for a replicated ClickHouse cluster
+  authRequired: true            # TDN_AUTH=required: never run open
+  extra: {}                     # any other TDN_* variables
+
+secrets:
+  # Use an existing Secret instead of the values below. Keys it may hold: TDN_API_KEYS,
+  # TDN_SESSION_SECRET, TDN_OIDC_ISSUER, TDN_OIDC_CLIENT_ID, TDN_OIDC_CLIENT_SECRET,
+  # TDN_OIDC_REDIRECT_URI, TDN_OIDC_ROLE_MAP, TDN_OIDC_ALLOWED_DOMAINS, TDN_DATABASE_URL,
+  # TDN_REDIS_URL, TDN_CLICKHOUSE, TDN_KAFKA_BOOTSTRAP, ANTHROPIC_API_KEY, OPENAI_API_KEY.
+  existingSecret: ""
+  apiKeys: ""                   # TDN_API_KEYS, comma-separated bootstrap owner keys
+  sessionSecret: ""             # TDN_SESSION_SECRET; generated once if empty
+  oidc: { issuer: "", clientId: "", clientSecret: "", redirectUri: "", roleMap: "", allowedDomains: "" }
+  anthropicApiKey: ""
+  openaiApiKey: ""
+
+external:
+  databaseUrl: ""               # postgresql://user:pass@host:5432/tracedown
+  redisUrl: ""                  # redis://host:6379/0
+  kafkaBootstrap: ""            # broker1:9092,broker2:9092
+  clickhouse: ""                # http://user:pass@host:8123, or the JSON multi-cluster router config
+
+migrations:
+  # Create or upgrade the database schema once per install/upgrade instead of racing at pod start.
+  enabled: true
+  hooks: "post-install,pre-upgrade"
+
+postgresql:
+  enabled: true
+  image: postgres:16.4
+  database: tracedown
+  username: tracedown
+  password: ""                  # generated if empty
+  storage: 20Gi
+  resources: { requests: { cpu: 250m, memory: 512Mi } }
+
+redis:
+  enabled: true
+  image: redis:7.4-alpine
+  storage: 2Gi
+  resources: { requests: { cpu: 100m, memory: 256Mi } }
+
+redpanda:
+  enabled: false                # Kafka-compatible broker; turns on the worker path
+  image: redpandadata/redpanda:v24.2.7
+  partitions: 12                # tdn.spans partitions: the ceiling on useful workers
+  storage: 20Gi
+  resources: { requests: { cpu: "1", memory: 2Gi } }
+
+clickhouse:
+  enabled: false                # spans in ClickHouse instead of Postgres
+  image: clickhouse/clickhouse-server:24.8
+  ttlDays: 30
+  storage: 100Gi
+  resources: { requests: { cpu: "1", memory: 4Gi } }
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile: { type: RuntimeDefault }
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: { drop: [ALL] }
+
+networkPolicy:
+  enabled: true
+  # A LabelSelector for the namespaces allowed to reach the server and web app (your ingress
+  # controller), e.g. { matchLabels: { kubernetes.io/metadata.name: ingress-nginx } }. Empty = any.
+  ingressNamespaceSelector: {}

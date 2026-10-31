@@ -30,11 +30,14 @@ Source = "https://github.com/nbn07/agent-tracedown"
 Issues = "https://github.com/nbn07/agent-tracedown/issues"
 
 [project.optional-dependencies]
-dev = ["pytest>=7", "httpx>=0.27", "chdb>=2", "pyjwt[crypto]>=2.8"]
+dev = ["pytest>=7", "httpx>=0.27", "chdb>=2", "pyjwt[crypto]>=2.8", "psycopg[binary]>=3.1", "psycopg-pool>=3.2",
+       "redis>=5"]
 sso = ["pyjwt[crypto]>=2.8"]
+postgres = ["psycopg[binary]>=3.1", "psycopg-pool>=3.2"]   # TDN_DATABASE_URL
+redis = ["redis>=5"]                                       # TDN_REDIS_URL
 clickhouse = []                      # HTTP client is stdlib; add chdb for embedded/local use
 kafka = ["confluent-kafka>=2.3"]
-enterprise = ["pyjwt[crypto]>=2.8", "confluent-kafka>=2.3"]
+enterprise = ["pyjwt[crypto]>=2.8", "confluent-kafka>=2.3", "psycopg[binary]>=3.1", "psycopg-pool>=3.2", "redis>=5"]
 
 [project.scripts]
 tracedown-server = "tracedown_server.__main__:main"

@@ -195,7 +195,8 @@ class Directory:
             return
         if role not in ROLES or role == "ingest":
             raise ValueError("role must be viewer, developer or admin")
-        self.store.execute("INSERT OR REPLACE INTO memberships VALUES (?,?,?)", (user_id, project, role))
+        self.store.execute("INSERT INTO memberships(user_id, project, role) VALUES (?,?,?) "
+                           "ON CONFLICT(user_id, project) DO UPDATE SET role=excluded.role", (user_id, project, role))
 
     def list_users(self) -> List[Dict[str, Any]]:
         users = self.store.query("SELECT id, email, name, org_role, disabled, created_at, last_login FROM users")

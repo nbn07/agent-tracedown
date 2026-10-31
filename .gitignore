@@ -8,3 +8,6 @@ node_modules/
 build/
 realworld/data/
 realworld/labeling/
+web/node_modules/
+web/.next/
+web/tsconfig.tsbuildinfo

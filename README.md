@@ -30,12 +30,17 @@ tracedown-import langfuse --errors-since 24h       # every run with an error in 
 tracedown-import otlp traces.json --failed         # an OTel export (GenAI conventions, OpenInference, OpenLLMetry)
 ```
 
-**Want the web UI** (runs, incidents, drift, analytics, live feed)?
+**Want the web app?** It shows runs, an interactive step graph of each run, the agent network, incidents, drift, analytics and a live feed.
 
 ```bash
-tracedown-server --db demo.db                                 # http://localhost:7070
+tracedown-server --db demo.db                                 # API on http://localhost:7070
 python examples/run_demo.py --endpoint http://localhost:7070
+cd web && npm install && npm run dev                          # http://localhost:3000
 ```
+
+Or start everything at once: `cd deploy && docker compose up -d`. The web app is at :3000 and the API at :7070.
+
+![Run detail: the AI stack trace, who is at fault, and the step graph with the cause highlighted](web/docs-screenshots/run-detail.png)
 
 ## How well does it work?
 
@@ -155,18 +160,30 @@ Open `#/diff/<original>/<replay>` in the UI for the step-by-step comparison. The
 | **Replay** | Exact, from a step, with a swapped model or prompt, or fully live. Recorded tool, retrieval and memory outputs are fed back, with a side-by-side diff |
 | **Hallucination investigator** | Each claim in an answer is linked to its source and labelled supported, partial, stale, unsupported or contradicted |
 | **Drift detection** | Compares runs across prompt versions, models, tool schemas or knowledge-base snapshots, and writes a report automatically |
+| **Web app** | Next.js: runs, an interactive step graph of each run with the cause highlighted, payloads, claims, replay, run comparison; light and dark themes |
 | **Multi-agent views** | Agent networks with handoffs and error rates, and a live span stream |
 | **Incidents** | Runs grouped by root cause, with severity, timeline and suggested fix. Notifications to Slack, PagerDuty, GitHub Issues or a webhook |
 | **Analytics** | Success rate, latency, tokens and cost per task, tool reliability, retrieval effectiveness, user feedback |
 | **OpenTelemetry for AI** | `gen_ai.*` conventions in and out. Importers for Langfuse, OpenInference and OpenLLMetry |
 | **Enterprise** | RBAC, OIDC single sign-on, hash-chained audit log, PII policies, Kafka/Redpanda ingest, multi-cluster ClickHouse |
 
-> **Status: v0.3, beta.** Everything above runs and is tested: about 100 tests, including the framework adapters against the real libraries. Not done yet:
-> - the Postgres metadata store (metadata is SQLite today);
-> - the richer React UI (a single-page viewer ships instead);
-> - live testing against a real Kafka broker and a real ClickHouse server.
->
-> Design: [docs/DESIGN.md](docs/DESIGN.md).
+## Deploy
+
+| Layout | Metadata | Spans | Ingest | For |
+|---|---|---|---|---|
+| One process | SQLite | SQLite | in-process | a laptop, a demo, one team |
+| Standard (Compose or Helm) | Postgres | Postgres | in-process, Redis cache | most teams; several API replicas |
+| Scale (Compose `--profile scale` or Helm) | Postgres | ClickHouse, one or more clusters routed by project | Kafka + workers | high span volume, data residency |
+
+```bash
+helm install tracedown deploy/helm/tracedown                       # server, worker, web, Postgres, Redis
+helm install tracedown deploy/helm/tracedown \
+  --set redpanda.enabled=true,clickhouse.enabled=true,ingress.enabled=true   # the scale layout
+```
+
+You can bring your own Postgres, Redis, Kafka and ClickHouse instead. The chart also covers autoscaling, disruption budgets, network policies and non-root containers. Details are in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
+> **Status: v0.3, beta.** About 100 unit tests run on both SQLite and Postgres, including the framework adapters against the real libraries. Integration tests run against Kafka, two ClickHouse clusters and Postgres. A full-stack test ([`deploy/e2e/stack.py`](deploy/e2e/stack.py)) runs the whole system (Postgres, Redis, a Kafka-protocol broker, two ClickHouse clusters, two API processes, two workers and the web app), sends real agent runs through it and checks every page in a browser. Design: [docs/DESIGN.md](docs/DESIGN.md).
 
 ## License
 
@@ -176,31 +193,33 @@ Everything in this repository is Apache-2.0: the SDK, the server, the root-cause
 
 | Variable | Purpose |
 |---|---|
-| `TDN_DB` | SQLite path for metadata |
+| `TDN_DB` | SQLite path for metadata (single-process setups) |
+| `TDN_DATABASE_URL` | Postgres for metadata, e.g. `postgresql://user:pass@host/tracedown` (`TDN_DATABASE_POOL` connections per process) |
+| `TDN_REDIS_URL` | Redis: shared read cache, live feed across replicas, ingest rate limits (`TDN_CACHE_TTL`, `TDN_INGEST_RATE_LIMIT`) |
 | `TDN_API_KEYS` | Bootstrap owner keys (comma-separated). Without keys, users or this, the server runs open (dev) |
 | `TDN_AUTH=required` | Refuse open mode even on a fresh install |
 | `TDN_JUDGE` | Optional LLM judge, e.g. `anthropic:claude-haiku-5-5` or `openai:gpt-4.1-mini` (uses `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`) |
 | `TDN_OIDC_ISSUER`, `_CLIENT_ID`, `_CLIENT_SECRET`, `_REDIRECT_URI`, `_ROLE_MAP`, `_ALLOWED_DOMAINS` | Single sign-on |
 | `TDN_SESSION_SECRET` | Signs SSO session cookies (set it in production) |
 | `TDN_CLICKHOUSE` | ClickHouse URL, or JSON router config for multi-cluster |
-| `TDN_KAFKA_BOOTSTRAP` | Ingest through Kafka/Redpanda; run `tracedown-worker` |
+| `TDN_KAFKA_BOOTSTRAP` | Ingest through Kafka/Redpanda; run `tracedown-worker`. The topic is created if missing (`TDN_KAFKA_PARTITIONS`, default 12) |
 | `TDN_OTLP_FORWARD`, `TDN_OTLP_HEADERS` | Forward finished runs to an OTLP endpoint |
 | `TDN_PRICES` | Model prices, USD per million tokens: `{"model": {"input": .., "output": ..}}` |
 | `TDN_DRIFT_MIN_RUNS` | Runs per cohort before a drift report (default 20) |
 | `TDN_PUBLIC_URL` | Used in notification links and the cookie `secure` flag |
 
-Or run everything with `docker compose -f deploy/docker-compose.yml up`.
 
 ## Repository
 
 ```
 spec/                 TDN telemetry spec (JSON Schema)
 sdk/python/           SDK: tracer, exporters, plugins, framework integrations, redaction
-server/tracedown_server/    API, pipeline, rca/, claims/, drift/, incidents/, importers/, analytics, enterprise/, static UI
+server/tracedown_server/    API, pipeline, rca/, claims/, drift/, incidents/, importers/, storage/ (SQLite, Postgres), cache (Redis), enterprise/
+web/                  Next.js web app (React, Tailwind, React Flow, Recharts)
 benchmark/            TDN-RCA-Bench: synthetic generator, data, scorer
 realworld/            evaluation on real failures: Who&When, τ-bench, live harnesses, label checks
 docs/                 design, standards proposal (OTel GenAI SIG)
-deploy/               Dockerfile, compose (dev / standard / scale), SQL DDL
+deploy/               Dockerfiles, Compose (standard / scale), Helm chart, SQL DDL, full-stack test (e2e/)
 examples/             demo agents, the end-to-end demo, sample OTel/Langfuse exports (imports/)
 ```
 

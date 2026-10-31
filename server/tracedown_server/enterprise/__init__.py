@@ -13,20 +13,38 @@ package.
 """
 from __future__ import annotations
 
-import json
 import os
 from typing import Optional
 
 
 def storage_from_env(db_path: str):
-    """``TDN_CLICKHOUSE`` = JSON router config, or a single URL, switches spans to ClickHouse."""
-    cfg = os.environ.get("TDN_CLICKHOUSE")
-    if not cfg:
+    """Pick the store from the environment; ``None`` means the default SQLite file at ``db_path``.
+
+    * ``TDN_DATABASE_URL=postgresql://...``: metadata (runs, findings, payloads, users, incidents...)
+      in Postgres (``TDN_DATABASE_POOL`` connections per process, default 10).
+    * ``TDN_CLICKHOUSE`` = JSON router config, or a single URL: spans in ClickHouse; metadata stays
+      in Postgres when ``TDN_DATABASE_URL`` is set, else in SQLite.
+    """
+    url = os.environ.get("TDN_DATABASE_URL")
+    if not url and not os.environ.get("TDN_CLICKHOUSE"):
         return None
-    from .clickhouse import ClusterRouter, HybridStore
-    config = json.loads(cfg) if cfg.strip().startswith("{") else \
-        {"clusters": {"default": {"url": cfg, "cluster": os.environ.get("TDN_CLICKHOUSE_CLUSTER") or None}}}
-    return HybridStore(db_path, ClusterRouter(config))
+    if url:
+        from ..storage.postgres import PostgresStore
+        store = PostgresStore(url, max_size=int(os.environ.get("TDN_DATABASE_POOL", "10")))
+    else:
+        from ..storage import SQLiteStore
+        store = SQLiteStore(db_path)
+    if os.environ.get("TDN_CLICKHOUSE"):
+        from .clickhouse import router_from_env, with_clickhouse_spans
+        store = with_clickhouse_spans(store, router_from_env())
+    return store
+
+
+def postgres_hybrid(url: str, router, **pool):
+    """Postgres metadata + ClickHouse spans."""
+    from ..storage.postgres import PostgresStore
+    from .clickhouse import with_clickhouse_spans
+    return with_clickhouse_spans(PostgresStore(url, **pool), router)
 
 
 def queue_from_env(handler) -> Optional[object]:

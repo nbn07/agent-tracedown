@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tdn.fullname" . }}-server
+  labels: {{- include "tdn.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+spec:
+  {{- if not .Values.server.autoscaling.enabled }}
+  replicas: {{ .Values.server.replicas }}
+  {{- end }}
+  selector:
+    matchLabels: {{- include "tdn.selector" (list . "server") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "tdn.labels" . | nindent 8 }}
+        app.kubernetes.io/component: server
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      {{- include "tdn.podCommon" . | nindent 6 }}
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: server
+          image: {{ include "tdn.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["tracedown-server"]
+          ports: [{ name: http, containerPort: {{ .Values.server.port }} }]
+          envFrom: {{- include "tdn.envFrom" . | nindent 12 }}
+          {{- with .Values.server.extraEnv }}
+          env: {{- toYaml . | nindent 12 }}
+          {{- end }}
+          startupProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 5
+            failureThreshold: 60          # waits up to 5 min for the database on first install
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 20
+            failureThreshold: 3
+          resources: {{- toYaml .Values.server.resources | nindent 12 }}
+          securityContext: {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts: [{ name: tmp, mountPath: /tmp }]
+      volumes: [{ name: tmp, emptyDir: {} }]
+      {{- with .Values.server.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.server.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      affinity:
+        {{- if .Values.server.affinity }}
+        {{- toYaml .Values.server.affinity | nindent 8 }}
+        {{- else }}
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels: {{- include "tdn.selector" (list . "server") | nindent 20 }}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tdn.fullname" . }}-server
+  labels: {{- include "tdn.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+spec:
+  selector: {{- include "tdn.selector" (list . "server") | nindent 4 }}
+  ports: [{ name: http, port: {{ .Values.server.port }}, targetPort: http }]

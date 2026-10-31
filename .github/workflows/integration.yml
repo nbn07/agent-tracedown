@@ -1,0 +1,82 @@
+name: integration
+
+# Runs the scale-out path against real services: Apache Kafka (KRaft) and two ClickHouse
+# servers, plus Postgres. Tests live in server/tests/integration and skip themselves when the
+# services are not configured, so `pytest` stays fast locally.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  services:
+    runs-on: ubuntu-latest
+    services:
+      kafka:
+        image: apache/kafka:3.9.1          # single-node KRaft broker on localhost:9092
+        ports: ["9092:9092"]
+      clickhouse-a:
+        image: clickhouse/clickhouse-server:24.8
+        env: { CLICKHOUSE_SKIP_USER_SETUP: "1" }
+        ports: ["8123:8123"]
+        options: --ulimit nofile=262144:262144
+      clickhouse-b:
+        image: clickhouse/clickhouse-server:24.8
+        env: { CLICKHOUSE_SKIP_USER_SETUP: "1" }
+        ports: ["8124:8123"]
+        options: --ulimit nofile=262144:262144
+      postgres:
+        image: postgres:16.4
+        env: { POSTGRES_USER: tdn, POSTGRES_PASSWORD: tdn, POSTGRES_DB: tdn }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U tdn" --health-interval 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -e ./sdk/python -e "./server[dev,enterprise]"
+      - name: Wait for Kafka and ClickHouse
+        run: |
+          for i in $(seq 60); do curl -sf localhost:8123/ping && curl -sf localhost:8124/ping && break; sleep 2; done
+          python - <<'PY'
+          import time
+          from confluent_kafka.admin import AdminClient
+          for _ in range(60):
+              try:
+                  AdminClient({"bootstrap.servers": "localhost:9092"}).list_topics(timeout=5); break
+              except Exception: time.sleep(2)
+          PY
+      - name: Integration tests
+        env:
+          TDN_IT_KAFKA_BOOTSTRAP: localhost:9092
+          TDN_IT_CLICKHOUSE_URLS: http://localhost:8123,http://localhost:8124
+          TDN_IT_DATABASE_URL: postgresql://tdn:tdn@localhost:5432/tdn
+        run: pytest -q server/tests/integration
+      - name: Whole server suite on Postgres
+        env:
+          TDN_TEST_DATABASE_URL: postgresql://tdn:tdn@localhost:5432/tdn
+        run: pytest -q server/tests
+      - name: Throughput (informational)
+        run: |
+          PYTHONPATH=server:sdk/python python server/tests/integration/kafka_throughput.py \
+            --bootstrap localhost:9092 --database-url postgresql://tdn:tdn@localhost:5432/tdn --runs 1000 --workers 1 3
+          PYTHONPATH=server:sdk/python python server/tests/integration/load_clickhouse.py --url http://localhost:8123 --spans 1000000
+
+  helm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with: { version: v3.16.2 }
+      - run: helm lint deploy/helm/tracedown
+      - name: Render and validate (kubeconform)
+        run: |
+          curl -sL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz | tar xz
+          for args in "" \
+            "--set redpanda.enabled=true,clickhouse.enabled=true,ingress.enabled=true,secrets.apiKeys=tdn_x" \
+            "--set postgresql.enabled=false,redis.enabled=false,external.databaseUrl=postgresql://u:p@db/t,external.kafkaBootstrap=k:9092,web.enabled=false"; do
+            helm template t deploy/helm/tracedown $args | ./kubeconform -strict -summary -kubernetes-version 1.31.0
+          done
+      - name: Compose files are valid
+        run: docker compose -f deploy/docker-compose.yml --profile scale config -q

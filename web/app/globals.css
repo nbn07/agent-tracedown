@@ -1,0 +1,89 @@
+@import "tailwindcss";
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/barlow-condensed/500.css";
+@import "@fontsource/barlow-condensed/600.css";
+
+/* Layout: an instrument panel. A slim rail of sections on the left, a dense working canvas
+   on the right; the flight-recorder orange marks only the cause of a failure. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --bg: #f3f4f1;
+  --panel: #ffffff;
+  --sunken: #eceee9;
+  --ink: #1b2125;
+  --muted: #5b656b;
+  --line: #d8dcd6;
+  --cause: #c94e0a;          /* the root cause: flight-recorder orange */
+  --cause-soft: #fbe5d8;
+  --accent: #245aa0;         /* interaction */
+  --accent-soft: #dfe8f5;
+  --ok: #2c7548; --ok-soft: #dcefe3;
+  --bad: #a3322a; --bad-soft: #f6dedb;
+  --warn: #946400; --warn-soft: #f5eacc;
+  --k-agent: #6a4c9c; --k-llm: #245aa0; --k-tool: #17766f; --k-retrieval: #946400;
+  --k-memory: #5b656b; --k-decision: #a23c78; --k-handoff: #7a6a4a; --k-embedding: #3d6e8f;
+  color-scheme: light;
+}
+.dark {
+  --bg: #111619;
+  --panel: #181e22;
+  --sunken: #1f262b;
+  --ink: #e4e8e6;
+  --muted: #9aa5ab;
+  --line: #2f383e;
+  --cause: #ff7a33;
+  --cause-soft: #3a2418;
+  --accent: #82abe6;
+  --accent-soft: #1d2a3b;
+  --ok: #6cc28c; --ok-soft: #1a3024;
+  --bad: #ef857b; --bad-soft: #3b2220;
+  --warn: #e3b14c; --warn-soft: #352b13;
+  --k-agent: #b39ae6; --k-llm: #82abe6; --k-tool: #5cc6bb; --k-retrieval: #e3b14c;
+  --k-memory: #9aa5ab; --k-decision: #e48ac0; --k-handoff: #c9b48a; --k-embedding: #86b9d9;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-sunken: var(--sunken);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-cause: var(--cause);
+  --color-cause-soft: var(--cause-soft);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --font-sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-display: "Barlow Condensed", "Arial Narrow", sans-serif;
+}
+
+html, body { background: var(--bg); color: var(--ink); }
+body { font-family: var(--font-sans); font-size: 14px; line-height: 1.5; }
+h1, h2, h3 { font-family: var(--font-display); letter-spacing: 0.01em; text-wrap: balance; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tabular { font-variant-numeric: tabular-nums; }
+.eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+
+/* React Flow, themed */
+.react-flow { --xy-background-color: transparent; --xy-edge-stroke: var(--muted); --xy-minimap-background-color: var(--panel);
+  --xy-controls-button-background-color: var(--panel); --xy-controls-button-color: var(--ink);
+  --xy-controls-button-border-color: var(--line); --xy-controls-button-background-color-hover: var(--sunken);
+  --xy-edge-label-background-color: var(--panel); --xy-edge-label-color: var(--muted); --xy-minimap-mask-background-color: color-mix(in srgb, var(--bg) 70%, transparent); }
+.react-flow__attribution { display: none; }
+.react-flow__edge-text { fill: var(--muted); font-size: 10px; }
+.react-flow__edge-textbg { fill: var(--panel); }
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }

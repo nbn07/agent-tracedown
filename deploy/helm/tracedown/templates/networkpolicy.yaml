@@ -1,0 +1,60 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- $root := . }}
+{{- range $c := list "server" "web" }}
+{{- if or (eq $c "server") $root.Values.web.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "tdn.fullname" $root }}-{{ $c }}
+  labels: {{- include "tdn.labels" $root | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{- include "tdn.selector" (list $root $c) | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - ports: [{ port: {{ ternary $root.Values.server.port $root.Values.web.port (eq $c "server") }} }]
+      {{- with $root.Values.networkPolicy.ingressNamespaceSelector }}
+      from:
+        - namespaceSelector: {{- toYaml . | nindent 12 }}
+        - podSelector: { matchLabels: { app.kubernetes.io/part-of: tracedown } }
+      {{- end }}
+{{- end }}
+{{- end }}
+{{- if include "tdn.kafkaEnabled" . }}
+---
+# Workers take no traffic except kubelet health checks.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "tdn.fullname" . }}-worker
+  labels: {{- include "tdn.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{- include "tdn.selector" (list . "worker") | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - ports: [{ port: {{ .Values.worker.healthPort }} }]
+{{- end }}
+{{- range $svc := list "postgresql" "redis" "redpanda" "clickhouse" }}
+{{- if (index $root.Values $svc).enabled }}
+---
+# The bundled {{ $svc }} accepts connections only from Tracedown pods in this release.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "tdn.fullname" $root }}-{{ $svc }}
+  labels: {{- include "tdn.labels" $root | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{- include "tdn.selector" (list $root $svc) | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ $root.Release.Name }}
+              app.kubernetes.io/part-of: tracedown
+{{- end }}
+{{- end }}
+{{- end }}

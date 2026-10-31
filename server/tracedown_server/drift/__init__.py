@@ -276,8 +276,12 @@ def values(store, agent: str, dimension: str, project: Optional[str] = None) -> 
 
 
 def save_report(store, report: Dict[str, Any], project: Optional[str] = None) -> Dict[str, Any]:
+    # Replace any earlier report for the same comparison (a NULL project never conflicts on UNIQUE).
+    store.execute("DELETE FROM drift_reports WHERE project IS ? AND agent=? AND dimension=? AND baseline=? "
+                  "AND candidate=?", (project, report["agent"], report["dimension"], report["baseline"],
+                                      report["candidate"]))
     store.execute(
-        "INSERT OR REPLACE INTO drift_reports(project, agent, dimension, baseline, candidate, verdict, severity, "
+        "INSERT INTO drift_reports(project, agent, dimension, baseline, candidate, verdict, severity, "
         "created_at, report) VALUES (?,?,?,?,?,?,?,?,?)",
         (project, report["agent"], report["dimension"], report["baseline"], report["candidate"],
          report["verdict"], report["severity"], time.time_ns(), json.dumps(report, default=str)))

@@ -1,0 +1,107 @@
+{{- /* Bundled single-node data services, for evaluation and small teams. Production: use the
+       `external` values and managed services or operators. */ -}}
+{{- $root := . }}
+{{- $fn := include "tdn.fullname" . }}
+{{- define "tdn.datastore" -}}
+{{- $root := index . 0 }}{{- $svc := index . 1 }}{{- $port := index . 2 }}{{- $mount := index . 3 }}{{- $uid := index . 4 }}{{- $spec := index . 5 }}
+{{- $v := index $root.Values $svc }}
+{{- $fn := include "tdn.fullname" $root }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fn }}-{{ $svc }}
+  labels: {{- include "tdn.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $svc }}
+spec:
+  selector: {{- include "tdn.selector" (list $root $svc) | nindent 4 }}
+  ports: [{ name: main, port: {{ $port }}, targetPort: {{ $port }} }]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $fn }}-{{ $svc }}
+  labels: {{- include "tdn.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: {{ $svc }}
+spec:
+  serviceName: {{ $fn }}-{{ $svc }}
+  replicas: 1
+  selector:
+    matchLabels: {{- include "tdn.selector" (list $root $svc) | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "tdn.labels" $root | nindent 8 }}
+        app.kubernetes.io/component: {{ $svc }}
+    spec:
+      automountServiceAccountToken: false
+      securityContext: { runAsNonRoot: true, runAsUser: {{ $uid }}, runAsGroup: {{ $uid }}, fsGroup: {{ $uid }}, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: {{ $svc }}
+          image: {{ $v.image }}
+          ports: [{ containerPort: {{ $port }} }]
+          {{- $spec | nindent 10 }}
+          resources: {{- toYaml $v.resources | nindent 12 }}
+          securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+          volumeMounts: [{ name: data, mountPath: {{ $mount }} }]
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: { requests: { storage: {{ $v.storage }} } }
+{{- end -}}
+
+{{- if .Values.postgresql.enabled }}
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $fn }}-postgresql
+  labels: {{- include "tdn.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: {{ include "tdn.pgPassword" . | quote }}
+{{- $pg := printf `env:
+  - { name: POSTGRES_DB, value: %q }
+  - { name: POSTGRES_USER, value: %q }
+  - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+  - name: POSTGRES_PASSWORD
+    valueFrom: { secretKeyRef: { name: %s-postgresql, key: POSTGRES_PASSWORD } }
+readinessProbe:
+  exec: { command: ["pg_isready", "-U", %q] }
+  periodSeconds: 10` .Values.postgresql.database .Values.postgresql.username $fn .Values.postgresql.username }}
+{{ include "tdn.datastore" (list . "postgresql" 5432 "/var/lib/postgresql/data" 999 $pg) }}
+{{- end }}
+
+{{- if .Values.redis.enabled }}
+{{- $rd := `args: ["redis-server", "--appendonly", "yes", "--dir", "/data", "--maxmemory-policy", "allkeys-lru"]
+readinessProbe:
+  exec: { command: ["redis-cli", "ping"] }
+  periodSeconds: 10` }}
+{{ include "tdn.datastore" (list . "redis" 6379 "/data" 999 $rd) }}
+{{- end }}
+
+{{- if .Values.redpanda.enabled }}
+{{- $rp := printf `args:
+  - redpanda
+  - start
+  - --overprovisioned
+  - --smp=1
+  - --memory=1G
+  - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+  - --advertise-kafka-addr=PLAINTEXT://%s-redpanda:9092
+  - --set=redpanda.auto_create_topics_enabled=true
+  - --set=redpanda.default_topic_partitions=%d
+readinessProbe:
+  tcpSocket: { port: 9092 }
+  periodSeconds: 10` $fn (int .Values.redpanda.partitions) }}
+{{ include "tdn.datastore" (list . "redpanda" 9092 "/var/lib/redpanda/data" 101 $rp) }}
+{{- end }}
+
+{{- if .Values.clickhouse.enabled }}
+{{- $ch := `env:
+  - { name: CLICKHOUSE_SKIP_USER_SETUP, value: "1" }
+readinessProbe:
+  httpGet: { path: /ping, port: 8123 }
+  periodSeconds: 10` }}
+{{ include "tdn.datastore" (list . "clickhouse" 8123 "/var/lib/clickhouse" 101 $ch) }}
+{{- end }}

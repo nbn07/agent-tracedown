@@ -45,16 +45,18 @@ class AuditLog:
         import threading
         self.store = store
         store.ensure_schema(SCHEMA)
-        # One lock per store: reading the chain head and appending must be one step.
-        self._lock = store.__dict__.setdefault("_audit_lock", threading.Lock())
+        # Reading the chain head and appending must be one step. On Postgres the lock is a database
+        # advisory lock, so it holds across server replicas; otherwise one lock per store.
+        serial = getattr(store, "serial_lock", None)
+        self._lock = serial("audit_log") if callable(serial) else \
+            store.__dict__.setdefault("_audit_lock", threading.Lock())
 
     def append(self, actor: str, action: str, resource: Optional[str] = None, project: Optional[str] = None,
                ip: Optional[str] = None, outcome: str = "ok", detail: Any = None) -> Dict[str, Any]:
         entry = {"at": time.time_ns(), "actor": actor, "action": action, "resource": resource, "project": project,
                  "ip": ip, "outcome": outcome,
                  "detail": json.dumps(detail, sort_keys=True, default=str) if detail is not None else None}
-        # Safe across threads of one process; with several API processes, give the audit log a
-        # single writer or a database-side sequence (Postgres: SELECT ... FOR UPDATE).
+        # Safe across threads; on Postgres also across processes and replicas (advisory lock).
         with self._lock:
             return self._append(entry, actor, action, resource, project, ip, outcome)
 

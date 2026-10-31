@@ -1,0 +1,28 @@
+Tracedown {{ .Chart.AppVersion }} is installed as "{{ .Release.Name }}".
+
+{{- if .Values.ingress.enabled }}
+Open https://{{ .Values.ingress.host }}
+{{- else }}
+Try it locally:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "tdn.fullname" . }}-{{ ternary "web" "server" .Values.web.enabled }} 8080:{{ ternary .Values.web.port .Values.server.port .Values.web.enabled }}
+  open http://localhost:8080
+{{- end }}
+
+Send runs to the API server from inside the cluster:
+  tdn.init(endpoint="http://{{ include "tdn.fullname" . }}-server.{{ .Release.Namespace }}:{{ .Values.server.port }}", api_key="tdn_...")
+
+{{- if not (include "tdn.hasDatabase" .) }}
+
+WARNING: no Postgres is configured (postgresql.enabled=false and external.databaseUrl is empty).
+Metadata lives in SQLite inside each pod and is lost on restart, and replicas do not share it.
+Use this only for a quick look.
+{{- end }}
+{{- if and (not .Values.secrets.apiKeys) (not .Values.secrets.existingSecret) (not .Values.secrets.oidc.issuer) }}
+
+NOTE: TDN_AUTH=required and no API keys or SSO are configured, so every request is refused.
+Set secrets.apiKeys (or secrets.oidc.*) and upgrade.
+{{- end }}
+{{- if or .Values.postgresql.enabled .Values.redis.enabled .Values.redpanda.enabled .Values.clickhouse.enabled }}
+
+Bundled data services are single-node with no backups. For production, use the `external` values.
+{{- end }}

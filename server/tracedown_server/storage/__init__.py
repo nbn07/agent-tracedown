@@ -259,7 +259,7 @@ class SQLiteStore:
                 for tool, rows in sorted(groups.items(), key=lambda kv: -len(kv[1]))]
 
     def stats(self, project: Optional[str] = None) -> Dict[str, Any]:
-        q = ("SELECT agent_name, COUNT(*) n, SUM(outcome='failure') failures, AVG(duration_ms) avg_ms, "
+        q = ("SELECT agent_name, COUNT(*) n, SUM(CASE WHEN outcome='failure' THEN 1 ELSE 0 END) failures, AVG(duration_ms) avg_ms, "
              "SUM(input_tokens) tin, SUM(output_tokens) tout FROM runs")
         args: list = []
         if project:

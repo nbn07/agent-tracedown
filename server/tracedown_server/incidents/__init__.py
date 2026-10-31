@@ -183,7 +183,7 @@ def record(store, project: str, report: Dict[str, Any], spans: List[Dict[str, An
             store.execute("UPDATE incidents SET status='open', resolved_at=NULL WHERE id=?", (iid,))
             _event(store, iid, "regressed", {"trace_id": report["trace_id"]})
             events.append("incident.regressed")
-    store.execute("INSERT OR IGNORE INTO incident_runs(incident_id, trace_id, at) VALUES (?,?,?)",
+    store.execute("INSERT INTO incident_runs(incident_id, trace_id, at) VALUES (?,?,?) ON CONFLICT DO NOTHING",
                              (iid, report["trace_id"], at))
     count = store.query("SELECT COUNT(*) n FROM incident_runs WHERE incident_id=?", (iid,))[0]["n"]
     hour = store.query("SELECT COUNT(*) n FROM incident_runs WHERE incident_id=? AND at>=?",
@@ -195,8 +195,8 @@ def record(store, project: str, report: Dict[str, Any], spans: List[Dict[str, An
         events.append("incident.escalated")
     else:
         sev = inc["severity"]
-    store.execute("UPDATE incidents SET run_count=?, last_seen=MAX(last_seen, ?), severity=? WHERE id=?",
-                  (count, at, sev, iid))
+    store.execute("UPDATE incidents SET run_count=?, last_seen=CASE WHEN last_seen > ? THEN last_seen ELSE ? END, "
+                  "severity=? WHERE id=?", (count, at, at, sev, iid))
     return {"incident": get(store, iid, with_timeline=False), "events": events}
 
 

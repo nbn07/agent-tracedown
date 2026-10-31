@@ -12,6 +12,7 @@ import argparse
 import json
 import os
 import sys
+import urllib.error
 import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -21,10 +22,20 @@ import agent_tracedown as tdn  # noqa: E402
 import demo_agents as demo  # noqa: E402
 
 
-def _get(endpoint, path):
-    with urllib.request.urlopen(endpoint + path, timeout=10) as r:
-        body = r.read().decode()
-    return body if path.endswith("stacktrace") else json.loads(body)
+def _get(endpoint, path, wait=60.0):
+    """GET, retrying while a run is not processed yet: with Kafka (TDN_KAFKA_BOOTSTRAP) the server
+    accepts spans at once and workers analyze them a moment later."""
+    import time
+    deadline = time.time() + wait
+    while True:
+        try:
+            with urllib.request.urlopen(endpoint + path, timeout=10) as r:
+                body = r.read().decode()
+            return body if path.endswith("stacktrace") else json.loads(body)
+        except urllib.error.HTTPError as e:
+            if e.code not in (404, 409) or time.time() > deadline:
+                raise
+            time.sleep(0.5)
 
 
 def _post(endpoint, path, payload=None):

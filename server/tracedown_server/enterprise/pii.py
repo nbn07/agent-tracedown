@@ -145,7 +145,9 @@ class PolicyEngine:
 
     def set(self, project: str, policy: Dict[str, Any], actor: str = "system") -> Dict[str, Any]:
         p = validate(policy)
-        self.store.execute("INSERT OR REPLACE INTO pii_policies VALUES (?,?,?,?)",
+        self.store.execute("INSERT INTO pii_policies(project, policy, updated_at, updated_by) VALUES (?,?,?,?) "
+                           "ON CONFLICT(project) DO UPDATE SET policy=excluded.policy, "
+                           "updated_at=excluded.updated_at, updated_by=excluded.updated_by",
                            (project, json.dumps(p), time.time_ns(), actor))
         return p
 
@@ -158,7 +160,7 @@ class PolicyEngine:
         day = time.strftime("%Y-%m-%d", time.gmtime())
         for det, n in sc.counts.items():
             self.store.execute("INSERT INTO pii_events VALUES (?,?,?,?) ON CONFLICT(project, day, detector) "
-                               "DO UPDATE SET count = count + excluded.count", (project, day, det, n))
+                               "DO UPDATE SET count = pii_events.count + excluded.count", (project, day, det, n))
         return out
 
     def stats(self, project: str) -> List[Dict[str, Any]]:

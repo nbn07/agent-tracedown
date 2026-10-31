@@ -1,0 +1,34 @@
+{{- $root := . }}
+{{- range $c := list "server" "worker" "web" }}
+{{- $v := index $root.Values $c }}
+{{- $on := and $v.autoscaling.enabled (or (eq $c "server") (and (eq $c "worker") (include "tdn.kafkaEnabled" $root)) (and (eq $c "web") $root.Values.web.enabled)) }}
+{{- if $on }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "tdn.fullname" $root }}-{{ $c }}
+  labels: {{- include "tdn.labels" $root | nindent 4 }}
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: {{ include "tdn.fullname" $root }}-{{ $c }} }
+  minReplicas: {{ $v.autoscaling.minReplicas }}
+  maxReplicas: {{ $v.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: {{ $v.autoscaling.targetCPUUtilizationPercentage }} } }
+{{- end }}
+{{- $minReplicas := ternary $v.autoscaling.minReplicas $v.replicas $v.autoscaling.enabled }}
+{{- $pdb := and $v.podDisruptionBudget.enabled (gt (int $minReplicas) 1) (or (eq $c "server") (and (eq $c "worker") (include "tdn.kafkaEnabled" $root)) (and (eq $c "web") $root.Values.web.enabled)) }}
+{{- if $pdb }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "tdn.fullname" $root }}-{{ $c }}
+  labels: {{- include "tdn.labels" $root | nindent 4 }}
+spec:
+  minAvailable: {{ $v.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels: {{- include "tdn.selector" (list $root $c) | nindent 6 }}
+{{- end }}
+{{- end }}

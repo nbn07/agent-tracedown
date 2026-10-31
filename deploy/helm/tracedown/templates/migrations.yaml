@@ -1,0 +1,31 @@
+{{- if and .Values.migrations.enabled (include "tdn.hasDatabase" .) }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "tdn.fullname" . }}-migrate-{{ .Release.Revision }}
+  labels: {{- include "tdn.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrate
+  annotations:
+    helm.sh/hook: {{ .Values.migrations.hooks | quote }}
+    helm.sh/hook-weight: "-5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 10                 # retries while a bundled database is still starting
+  template:
+    metadata:
+      labels: {{- include "tdn.labels" . | nindent 8 }}
+        app.kubernetes.io/component: migrate
+    spec:
+      {{- include "tdn.podCommon" . | nindent 6 }}
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: {{ include "tdn.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # Building the app creates or upgrades every table it uses, once, before pods race.
+          command: ["python", "-c", "from tracedown_server.api import create_app; create_app(queue=False); print('schema ready')"]
+          envFrom: {{- include "tdn.envFrom" . | nindent 12 }}
+          securityContext: {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts: [{ name: tmp, mountPath: /tmp }]
+      volumes: [{ name: tmp, emptyDir: {} }]
+{{- end }}

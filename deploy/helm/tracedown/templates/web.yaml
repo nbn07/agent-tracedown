@@ -1,0 +1,55 @@
+{{- if .Values.web.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tdn.fullname" . }}-web
+  labels: {{- include "tdn.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web
+spec:
+  {{- if not .Values.web.autoscaling.enabled }}
+  replicas: {{ .Values.web.replicas }}
+  {{- end }}
+  selector:
+    matchLabels: {{- include "tdn.selector" (list . "web") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "tdn.labels" . | nindent 8 }}
+        app.kubernetes.io/component: web
+    spec:
+      {{- include "tdn.podCommon" . | nindent 6 }}
+      containers:
+        - name: web
+          image: {{ .Values.web.image.repository }}:{{ .Values.web.image.tag | default .Chart.AppVersion }}
+          imagePullPolicy: {{ .Values.web.image.pullPolicy }}
+          ports: [{ name: http, containerPort: {{ .Values.web.port }} }]
+          env:
+            - { name: PORT, value: {{ .Values.web.port | quote }} }
+            - { name: HOSTNAME, value: "0.0.0.0" }
+            # the web app proxies /api and /v1 to the API server
+            - { name: TDN_API_URL, value: {{ printf "http://%s-server:%v" (include "tdn.fullname" .) .Values.server.port | quote }} }
+          readinessProbe:
+            httpGet: { path: /, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          resources: {{- toYaml .Values.web.resources | nindent 12 }}
+          securityContext: {{- toYaml .Values.securityContext | nindent 12 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+            - { name: next-cache, mountPath: /app/.next/cache }
+      volumes:
+        - { name: tmp, emptyDir: {} }
+        - { name: next-cache, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tdn.fullname" . }}-web
+  labels: {{- include "tdn.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web
+spec:
+  selector: {{- include "tdn.selector" (list . "web") | nindent 4 }}
+  ports: [{ name: http, port: {{ .Values.web.port }}, targetPort: http }]
+{{- end }}

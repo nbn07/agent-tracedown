@@ -22,6 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .. import __version__, analytics, drift, incidents
+from ..cache import RateLimiter, cache_from_env, wrap_store
 from ..claims import investigate
 from ..enterprise import queue_from_env
 from ..enterprise.audit import AuditLog
@@ -104,16 +105,27 @@ class RolesIn(BaseModel):
 
 def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]] = None,
                notifier_transport=None, oidc: Optional[OIDC] = None, queue=None,
-               require_auth: Optional[bool] = None) -> FastAPI:
+               require_auth: Optional[bool] = None, cache: Any = "env") -> FastAPI:
     if store is None:
         from ..enterprise import storage_from_env
         path = os.environ.get("TDN_DB", "agent_tracedown.db")
         store = storage_from_env(path) or SQLiteStore(path)
+    # TDN_REDIS_URL: shared read cache, live feed across replicas, shared ingest rate limits.
+    cache = cache_from_env() if cache == "env" else cache
+    store = wrap_store(store, cache)
     store.ensure_schema(analytics.SCHEMA)
     policies = PolicyEngine(store)
     notifier = hooks.Notifier(store, base_url=os.environ.get("TDN_PUBLIC_URL", ""),
                               **({"transport": notifier_transport} if notifier_transport else {}))
-    pipeline = Pipeline(store, notifier=notifier, pii=policies)
+    pipeline = Pipeline(store, notifier=notifier, pii=policies, bus=cache.event_bus() if cache else None)
+    limiter = RateLimiter(int(os.environ.get("TDN_INGEST_RATE_LIMIT", "0")), cache)
+
+    def cached(name: str, fn, project: Optional[str] = None, args: tuple = (), ttl: int = 30):
+        return cache.get_or_set(name, fn, project=project, args=args, ttl=ttl) if cache else fn()
+
+    def rate_limit(p: Principal) -> None:
+        if not limiter.allow(p.id):
+            raise HTTPException(429, f"ingest rate limit: {limiter.per_minute} requests per minute")
     directory = Directory(store, static_keys=api_keys, require_auth=require_auth)
     audit = AuditLog(store)
     oidc = oidc if oidc is not None else OIDC.from_env()
@@ -122,6 +134,7 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
 
     app = FastAPI(title="Tracedown", version=__version__, description="The flight recorder for AI agents.")
     app.state.store, app.state.pipeline, app.state.directory, app.state.audit = store, pipeline, directory, audit
+    app.state.cache = cache
 
     # -------------------------------------------------------------- auth plumbing
     def principal(request: Request) -> Principal:
@@ -189,6 +202,7 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
     @ingest.post("/ingest/spans")
     def ingest_spans(batch: SpanBatch, response: Response, p: Principal = Depends(principal)) -> Dict[str, Any]:
         need(p, "ingest", batch.project)
+        rate_limit(p)
         spans = [s.model_dump() for s in batch.spans]
         try:
             store.check_ownership(batch.project, spans)
@@ -202,6 +216,7 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
     @ingest.post("/ingest/blobs")
     def ingest_blobs(batch: BlobBatch, p: Principal = Depends(principal)) -> Dict[str, Any]:
         need(p, "ingest", batch.project)
+        rate_limit(p)
         try:
             return {"accepted": pipeline.process_blobs(batch.project, batch.blobs)}
         except ValueError as exc:
@@ -211,6 +226,7 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
     def ingest_otlp(body: Dict[str, Any], project: str = "default", p: Principal = Depends(principal)) -> Dict[str, Any]:
         """OTLP/HTTP JSON receiver: any agent emitting OTel GenAI spans works without the TDN SDK."""
         need(p, "ingest", project)
+        rate_limit(p)
         try:
             accepted = 0
             for _, spans, blobs in import_otlp([body]):
@@ -224,6 +240,15 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
             raise HTTPException(422, str(exc)) from exc
 
     # -------------------------------------------------------------- runs
+    @api.get("/facets", tags=["runs"])
+    def facets(project: Optional[str] = None, p: Principal = Depends(principal)) -> Dict[str, Any]:
+        """Projects this caller can see, and the agents in them (or in one project), for filter menus."""
+        need(p, "runs:read", project)
+        rows = [r for r in store.query("SELECT DISTINCT project, agent_name FROM runs") if visible(p, r["project"])]
+        return {"projects": sorted({r["project"] for r in rows if r["project"]}),
+                "agents": sorted({r["agent_name"] for r in rows
+                                  if r["agent_name"] and (project is None or r["project"] == project)})}
+
     @api.get("/runs", tags=["runs"])
     def list_runs(project: Optional[str] = None, agent: Optional[str] = None, outcome: Optional[str] = None,
                   limit: int = Query(50, le=500), offset: int = 0, p: Principal = Depends(principal)) -> Dict[str, Any]:
@@ -232,6 +257,7 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
         for r in runs:
             f = store.get_findings(r["trace_id"])
             r["root_cause"] = f["root_cause"] if f else None
+            r["fault"] = f.get("fault") if f else None
             claims = ((r.get("profile") or {}).get("features") or {}).get("claims")
             r["hallucination_score"] = claims["hallucination_score"] if claims else None
             r.pop("attributes", None)
@@ -327,7 +353,10 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
         need(p, "runs:read", project)
         runs = [r for r in store.list_runs(project, agent, None, limit, 0)
                 if visible(p, r["project"]) and not r["replay_of"]]
-        return merge_graphs([build_graph(store.get_spans(r["trace_id"])) for r in runs], runs=len(runs))
+        visible_ids = tuple(r["trace_id"] for r in runs)
+        return cached("agent_graph", lambda: merge_graphs([build_graph(store.get_spans(t)) for t in visible_ids],
+                                                          runs=len(visible_ids)),
+                      project=project, args=(agent, visible_ids))
 
     @api.get("/live", tags=["visualization"])
     def live(request: Request, project: Optional[str] = None, p: Principal = Depends(principal)):
@@ -359,7 +388,8 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
                       p: Principal = Depends(principal)) -> Dict[str, Any]:
         need(p, "metrics:read", project)
         require_scope(p, project)
-        return analytics.overview(store, project, agent, days)
+        return cached("analytics", lambda: analytics.overview(store, project, agent, days), project=project,
+                      args=(agent, days))
 
     @api.get("/metrics/agents", tags=["analytics"])
     def agent_metrics(project: Optional[str] = None, p: Principal = Depends(principal)) -> Dict[str, Any]:

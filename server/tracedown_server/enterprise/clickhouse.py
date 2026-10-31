@@ -1,8 +1,9 @@
 """ClickHouse span storage, single node or multi-cluster.
 
 ``HybridStore`` keeps run metadata, findings, incidents and the rest in the
-relational store (SQLite here; Postgres DDL in ``deploy/sql``) and moves the
-high-volume span table to ClickHouse.
+relational store (SQLite, or Postgres via ``with_clickhouse_spans``) and moves the
+high-volume span table to ClickHouse. ``store_from_env`` builds the right combination
+from ``TDN_DATABASE_URL`` and ``TDN_CLICKHOUSE``.
 
 Multi-cluster: ``ClusterRouter`` maps each project to a named cluster (for data
 residency, e.g. EU tenants on an EU cluster, or to spread load). On a replicated
@@ -199,12 +200,14 @@ class ClusterRouter:
         return []
 
 
-class HybridStore(SQLiteStore):
-    """Relational metadata + ClickHouse spans. Same interface as ``SQLiteStore``."""
+class ClickHouseSpansMixin:
+    """Spans in ClickHouse, everything else in the relational store it is mixed into.
 
-    def __init__(self, path: str, router: ClusterRouter) -> None:
-        super().__init__(path)
-        self.router = router
+    ``_refresh_run`` (the run summary) reads spans through ``self.get_spans``, so it sees
+    the ClickHouse copy whichever relational store is underneath.
+    """
+
+    router: "ClusterRouter"
 
     def put_spans(self, project: str, spans: Iterable[Dict[str, Any]]) -> int:
         spans = list(spans)
@@ -232,3 +235,46 @@ class HybridStore(SQLiteStore):
                  # Across clusters this is the worst cluster's percentile, a conservative bound.
                  "latency_ms": {"p50": max(e["p50"]), "p95": max(e["p95"])}}
                 for t, e in sorted(merged.items(), key=lambda kv: -kv[1]["calls"])]
+
+
+class HybridStore(ClickHouseSpansMixin, SQLiteStore):
+    """SQLite metadata + ClickHouse spans. Same interface as ``SQLiteStore``."""
+
+    def __init__(self, path: str, router: ClusterRouter) -> None:
+        super().__init__(path)
+        self.router = router
+
+
+_HYBRIDS: Dict[type, type] = {}
+
+
+def with_clickhouse_spans(store, router: ClusterRouter):
+    """Move an existing relational store's spans to ClickHouse (e.g. a ``PostgresStore``)."""
+    cls = type(store)
+    if cls not in _HYBRIDS:
+        _HYBRIDS[cls] = type("ClickHouse" + cls.__name__, (ClickHouseSpansMixin, cls), {})
+    store.__class__ = _HYBRIDS[cls]
+    store.router = router
+    return store
+
+
+def router_from_env() -> Optional[ClusterRouter]:
+    """``TDN_CLICKHOUSE`` = JSON router config, or a single URL (``TDN_CLICKHOUSE_CLUSTER`` optional)."""
+    import os
+    cfg = os.environ.get("TDN_CLICKHOUSE")
+    if not cfg:
+        return None
+    config = json.loads(cfg) if cfg.strip().startswith("{") else \
+        {"clusters": {"default": {"url": cfg, "cluster": os.environ.get("TDN_CLICKHOUSE_CLUSTER") or None}}}
+    return ClusterRouter(config)
+
+
+def store_from_env(db_path: str = "agent_tracedown.db"):
+    """The store a deployment uses, from the shared environment variables (one implementation,
+    used by both the API and ``tracedown-worker``):
+
+    * metadata: ``TDN_DATABASE_URL`` (Postgres) if set, else SQLite at ``db_path``;
+    * spans: ClickHouse if ``TDN_CLICKHOUSE`` is set, else the metadata store.
+    """
+    from . import storage_from_env
+    return storage_from_env(db_path) or SQLiteStore(db_path)
