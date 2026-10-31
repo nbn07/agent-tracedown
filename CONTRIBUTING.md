@@ -24,3 +24,7 @@ tracedown-server --db dev.db       # then: python examples/run_demo.py --endpoin
 ```
 
 Larger changes: open an issue first, or add an ADR in `docs/adr/`.
+
+## License
+
+Tracedown is Apache-2.0, with every feature free and no paid edition. By submitting a contribution you agree it is licensed under Apache-2.0 too (section 5 of the license).

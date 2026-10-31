@@ -11,7 +11,7 @@ Agents fail quietly. A model writes "Friday" where a date belongs. A retriever r
 - **"Who is at fault?"** A verdict on every failed run: the agent, the user, or nobody yet, because many "agent failures" turn out to be the user's.
 - **Works with what you have.** One line for LangGraph, the OpenAI Agents SDK, CrewAI, AutoGen, Semantic Kernel and LlamaIndex. You can also import runs you already record in **Langfuse**, **Arize Phoenix** or any **OpenTelemetry** exporter.
 
-Self-hosted, Apache-2.0. The SDK has no dependencies. An LLM is optional: the rules work without one, and an inexpensive judge model makes them sharper.
+Self-hosted, Apache-2.0, and every feature is free, including the enterprise ones: single sign-on, roles, audit log, PII policies and scale-out storage. There is no paid edition. The SDK has no dependencies. An LLM is optional: the rules work without one, and an inexpensive judge model makes them sharper.
 
 ## Try it in a minute
 
@@ -167,6 +167,10 @@ Open `#/diff/<original>/<replay>` in the UI for the step-by-step comparison. The
 > - live testing against a real Kafka broker and a real ClickHouse server.
 >
 > Design: [docs/DESIGN.md](docs/DESIGN.md).
+
+## License
+
+Everything in this repository is Apache-2.0: the SDK, the server, the root-cause engine and judge, the importers, the web viewer and the enterprise features. There is no paid tier, no feature held back, and no license key. Use it at work, change it and ship it. Contributions are welcome under the same license (see [CONTRIBUTING.md](CONTRIBUTING.md)).
 
 ## Configuration
 
