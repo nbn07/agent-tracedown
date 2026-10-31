@@ -1,0 +1,37 @@
+name: release
+
+# Publishes agent-tracedown (SDK) and agent-tracedown-server to PyPI when a version tag
+# such as v0.3.0 is pushed. Uses PyPI trusted publishing: no API token is stored here.
+# One-time setup is in RELEASING.md.
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Check the tag matches both package versions
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          grep -q "^version = \"$tag\"" sdk/python/pyproject.toml
+          grep -q "^version = \"$tag\"" server/pyproject.toml
+      - run: pip install build twine
+      - run: python -m build sdk/python --outdir dist && python -m build server --outdir dist
+      - run: twine check dist/*
+      - uses: actions/upload-artifact@v4
+        with: { name: dist, path: dist/ }
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: dist, path: dist/ }
+      - uses: pypa/gh-action-pypi-publish@release/v1

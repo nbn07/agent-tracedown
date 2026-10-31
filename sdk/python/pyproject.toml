@@ -4,11 +4,29 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-tracedown"
-version = "0.2.0"
-description = "The flight recorder for AI agents: tracing, AI stack traces, root-cause analysis and replay."
+version = "0.3.0"
+description = "The flight recorder for AI agents: find the step that caused a failure, then replay the run with a fix."
+readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "Apache-2.0" }
 dependencies = []  # stdlib only, by design
+authors = [{ name = "Naveen Nair" }]
+keywords = ["ai-agents", "llm", "observability", "debugging", "root-cause-analysis", "opentelemetry", "tracing", "langfuse"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Debuggers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: System :: Monitoring",
+]
+
+
+[project.urls]
+Homepage = "https://github.com/nbn07/agent-tracedown"
+Source = "https://github.com/nbn07/agent-tracedown"
+Issues = "https://github.com/nbn07/agent-tracedown/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=7"]

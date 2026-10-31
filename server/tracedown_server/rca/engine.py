@@ -229,7 +229,8 @@ def render_stack_trace(report: Dict[str, Any], run: RunView) -> str:
     others = [f for f in report["findings"] if f["id"] not in (top["id"], lead["id"])]
     if others:
         lines.append("  also:       " + "; ".join(f"{f['label']} (step {f['step']}, {f['confidence']:.2f})" for f in others[:3]))
-    lines.append(f"  next:       tracedown replay {report['trace_id'][:8]} --from-step {top['step']}")
+    lines.append(f"  next:       replay from step {top['step']} with your fix: "
+                 f"tdn.replay(bundle, mode=\"from-step\", from_step={top['step']})")
     return "\n".join(lines)
 
 
