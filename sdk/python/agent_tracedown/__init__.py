@@ -20,6 +20,7 @@ from .tracer import (
     retrieval,
     run,
     tool_call,
+    traced_run,
     validate_args,
 )
 
@@ -27,5 +28,5 @@ __all__ = [
     "init", "run", "agent", "llm_call", "tool_call", "retrieval", "memory_read", "memory_write",
     "decision", "handoff", "declare_tools", "OtlpHttpExporter", "FanoutExporter", "replay", "fetch_bundle", "current_trace_id", "validate_args",
     "MemoryExporter", "ConsoleExporter", "HttpExporter", "to_otlp_json",
-    "ManualTrace", "ReplayDivergence", "ToolError", "plugins", "__version__",
+    "ManualTrace", "ReplayDivergence", "ToolError", "traced_run", "plugins", "__version__",
 ]
