@@ -45,3 +45,19 @@ def _store_backend(monkeypatch, request):
     with psycopg.connect(URL, autocommit=True) as c:
         for schema in {s.schema for s in made}:
             c.execute(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
+
+
+@pytest.fixture
+def chdb_client():
+    """An embedded ClickHouse engine (chdb), closed when the test ends.
+
+    Left open until the interpreter exits, chdb's background threads race Python's own
+    shutdown and sometimes crash the test run with a segfault (exit code 139) after every
+    test has passed. Seen on Python 3.10 in CI; about 1 run in 4 for the test alone."""
+    pytest.importorskip("chdb")
+    from tracedown_server.enterprise.clickhouse import ChdbClient
+    client = ChdbClient()
+    try:
+        yield client
+    finally:
+        client.close()

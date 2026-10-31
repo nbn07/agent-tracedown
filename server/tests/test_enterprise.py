@@ -221,11 +221,10 @@ def test_pii_policy_applies_at_ingest(mem):
 
 # ----------------------------------------------------------------------------- ClickHouse (embedded)
 
-def test_clickhouse_hybrid_store_with_two_clusters(mem):
-    pytest.importorskip("chdb")
-    from tracedown_server.enterprise.clickhouse import ChdbClient, ClusterRouter, HybridStore
+def test_clickhouse_hybrid_store_with_two_clusters(mem, chdb_client):
+    from tracedown_server.enterprise.clickhouse import ClusterRouter, HybridStore
 
-    client = ChdbClient()  # one embedded engine, two databases standing in for two clusters
+    client = chdb_client  # one embedded engine, two databases standing in for two clusters
     router = ClusterRouter({"clusters": {"us": {"database": "tdn_us"}, "eu": {"database": "tdn_eu"}},
                             "routes": {"acme-eu": "eu"}, "default": "us"}, client_factory=lambda cfg: client)
     store = HybridStore(":memory:", router)

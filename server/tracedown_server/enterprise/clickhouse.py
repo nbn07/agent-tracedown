@@ -77,6 +77,11 @@ class ChdbClient:
         text = str(self._s.query(sql, "JSONEachRow"))
         return [json.loads(line) for line in text.splitlines() if line.strip()]
 
+    def close(self) -> None:
+        """Shut the embedded engine down now. Left to interpreter exit, chdb's background
+        threads can race Python's own shutdown and crash the process (exit code 139)."""
+        self._s.close()
+
 
 def span_ddl(database: str = "tdn", cluster: Optional[str] = None, ttl_days: int = 30) -> List[str]:
     on = f" ON CLUSTER {cluster}" if cluster else ""

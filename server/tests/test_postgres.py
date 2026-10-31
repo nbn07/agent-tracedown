@@ -176,11 +176,10 @@ def test_app_on_postgres_via_environment(monkeypatch):
 
 
 @needs_pg
-def test_postgres_metadata_with_clickhouse_spans(pg):
-    pytest.importorskip("chdb")
+def test_postgres_metadata_with_clickhouse_spans(pg, chdb_client):
     from tracedown_server.enterprise import postgres_hybrid
-    from tracedown_server.enterprise.clickhouse import ChdbClient, ClusterRouter
-    client = ChdbClient()
+    from tracedown_server.enterprise.clickhouse import ClusterRouter
+    client = chdb_client
     db = "tdn_pg_" + uuid.uuid4().hex[:8]
     router = ClusterRouter({"clusters": {"main": {"database": db}}, "default": "main"},
                            client_factory=lambda cfg: client)
