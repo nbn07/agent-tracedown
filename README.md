@@ -154,7 +154,7 @@ The TypeScript SDK records the same data as the Python one, and the same run get
 | Vercel AI SDK (TypeScript) | `generateText({ model: traceModel(model), tools: traceTools(tools), ... })` |
 | OpenAI Agents SDK (TypeScript) | `await instrument()` from `agent-tracedown/openai-agents` |
 
-Python adapters live in `agent_tracedown.integrations` (`langchain`, `openai_agents`, `claude_agent`, `google_adk`, `pydantic_ai`, `mcp`, `crewai`, `autogen`, `semantic_kernel`, `llamaindex`). Each one is tested against the real library: LangGraph 1.2, openai-agents 0.24, claude-agent-sdk 0.2, google-adk 2.13, pydantic-ai 2.64, mcp 2.3, CrewAI 1.15, AutoGen 0.7, Semantic Kernel 1.46 and LlamaIndex 0.14. The TypeScript ones are tested against Vercel AI SDK 5, 6 and 7 and @openai/agents 0.21. Adapters observe the framework. Replay substitutes outputs only for calls that go through `tdn.llm_call` / `tdn.tool_call`, an instrumented model client, or (in TypeScript) a model wrapped with `traceModel`.
+Python adapters live in `agent_tracedown.integrations` (`langchain`, `openai_agents`, `claude_agent`, `google_adk`, `pydantic_ai`, `mcp`, `crewai`, `autogen`, `semantic_kernel`, `llamaindex`). Each one is tested against the real library: LangGraph 1.2, openai-agents 0.24, claude-agent-sdk 0.2, google-adk 2.13, pydantic-ai 2.64, mcp 1.30 and 2.3, CrewAI 1.15, AutoGen 0.7, Semantic Kernel 1.46 and LlamaIndex 0.14. The TypeScript ones are tested against Vercel AI SDK 5, 6 and 7 and @openai/agents 0.21. Adapters observe the framework. Replay substitutes outputs only for calls that go through `tdn.llm_call` / `tdn.tool_call`, an instrumented model client, or (in TypeScript) a model wrapped with `traceModel`.
 
 ### Import from Langfuse and OpenTelemetry
 

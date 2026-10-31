@@ -258,10 +258,15 @@ def test_pydantic_ai_retried_tool_marked_failed(mem):
 # ----------------------------------------------------------------------------- MCP
 
 def _mcp_server():
+    """A small billing server. MCP 2.x has ``MCPServer``; 1.x (still what most projects,
+    CrewAI and Semantic Kernel included, pull in) has ``FastMCP``. Test both."""
     pytest.importorskip("mcp")
-    from mcp.server.mcpserver import MCPServer
+    try:
+        from mcp.server.mcpserver import MCPServer as Server
+    except ImportError:
+        from mcp.server.fastmcp import FastMCP as Server
 
-    srv = MCPServer("billing")
+    srv = Server("billing")
 
     @srv.tool()
     def refund(order_id: int, amount: float) -> dict:
@@ -278,21 +283,29 @@ def _mcp_server():
     return srv
 
 
+def _mcp_client(srv):
+    """An in-memory client: ``mcp.Client`` on 2.x, a ``ClientSession`` on 1.x."""
+    import mcp
+    if hasattr(mcp, "Client"):
+        return mcp.Client(srv)
+    from mcp.shared.memory import create_connected_server_and_client_session
+    return create_connected_server_and_client_session(srv)
+
+
 def test_mcp_client_tool_calls_and_tools_declared(mem):
     srv = _mcp_server()
-    from mcp import Client
 
     from agent_tracedown.integrations import mcp as tdn_mcp
 
     async def main():
-        async with Client(srv) as client:
+        async with _mcp_client(srv) as client:
             tdn_mcp.instrument(client, server="billing")
             tdn_mcp.instrument(client, server="billing")  # idempotent
             with tdn.run("Support", input="refund order 42") as run:
                 await client.list_tools()
                 await client.call_tool("lookup_order", {"order_id": 42})
                 bad = await client.call_tool("refund", {"order_id": 42, "amount": 80})
-                assert bad.is_error
+                assert getattr(bad, "is_error", None) or getattr(bad, "isError", None)
                 run.output("Refunded $80.")
                 run.fail("customer: refund never arrived")
             await client.call_tool("refund", {"order_id": 2, "amount": 1})  # outside a run: not recorded
@@ -315,13 +328,14 @@ def test_mcp_instrument_all_patches_client_class(mem):
 
     from agent_tracedown.integrations import mcp as tdn_mcp
 
-    orig = {c: (c.__dict__["call_tool"], c.__dict__["list_tools"]) for c in (mcp.Client, mcp.ClientSession)}
+    classes = [c for c in (getattr(mcp, "Client", None), mcp.ClientSession) if c is not None]
+    orig = {c: (c.__dict__["call_tool"], c.__dict__["list_tools"]) for c in classes}
     try:
         tdn_mcp.instrument_all()
         tdn_mcp.instrument_all()  # idempotent
 
         async def main():
-            async with mcp.Client(srv) as client:
+            async with _mcp_client(srv) as client:
                 with tdn.run("Support"):
                     await client.call_tool("refund", {"order_id": 1, "amount": 5})
 

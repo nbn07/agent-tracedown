@@ -56,3 +56,6 @@ jobs:
         with: { python-version: "3.12" }
       - run: pip install pytest -e "./sdk/python[${{ matrix.extra }}]"
       - run: PYTHONPATH=sdk/python pytest -q sdk/python/tests/integrations
+      - name: MCP 1.x too (most projects still use it)
+        if: matrix.extra == 'mcp'
+        run: pip install "mcp>=1.30,<2" && PYTHONPATH=sdk/python pytest -q sdk/python/tests/integrations

@@ -31,8 +31,14 @@ _MARK = "__tdn_mcp_wrapped__"
 _inside = contextvars.ContextVar("tdn_mcp_inside", default=False)
 
 
+def _field(obj: Any, snake: str, camel: str, default: Any = None) -> Any:
+    """MCP 2.x names fields in snake_case (``is_error``); 1.x in camelCase (``isError``)."""
+    value = getattr(obj, snake, None)
+    return value if value is not None else getattr(obj, camel, default)
+
+
 def _content(result: Any) -> Any:
-    structured = getattr(result, "structured_content", None)
+    structured = _field(result, "structured_content", "structuredContent")
     if structured is not None:
         return to_jsonable(structured)
     parts = getattr(result, "content", None) or []
@@ -43,8 +49,8 @@ def _content(result: Any) -> Any:
 
 
 def _tool_dicts(result: Any) -> List[Dict[str, Any]]:
-    return [{"name": t.name, "description": t.description or t.title or "",
-             "schema": to_jsonable(getattr(t, "input_schema", None))}
+    return [{"name": t.name, "description": t.description or getattr(t, "title", None) or "",
+             "schema": to_jsonable(_field(t, "input_schema", "inputSchema"))}
             for t in (getattr(result, "tools", None) or [])]
 
 
@@ -68,7 +74,7 @@ def _wrap_call_tool(fn: Any, server: Optional[str]) -> Any:
             result = await fn(name, arguments, *args, **kwargs)
             if span is not None:
                 out = _content(result)
-                if getattr(result, "is_error", False):
+                if _field(result, "is_error", "isError", False):
                     span.error(str(out)[:500] or "MCP tool returned isError")
                 else:
                     span.output_digest = _put_blob(state, out)
