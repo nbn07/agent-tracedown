@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import contextlib
 import contextvars
+import functools
+import inspect
 import hashlib
 import json
 import re
@@ -266,6 +268,39 @@ def run(name: str, input: Any = None, **attrs: Any) -> Iterator[RunHandle]:
             # The same _Replay may drive several runs in a test; reset its bookkeeping.
             replay.served, replay.live, replay.first_divergence = [], [], None
         state.flush([s for s in state.spans if s is not root] + [root])
+
+def traced_run(name: str, **attrs: Any) -> Callable:
+    """Decorate a function so each call is recorded as a run.
+
+    The first positional argument (or, when called by keyword, the first keyword
+    argument) is recorded as the run input. The returned value is recorded as
+    the run output. Exceptions are recorded by :func:`run` and re-raised.
+    """
+    def decorate(func: Callable) -> Callable:
+        def get_input(args: tuple, kwargs: Dict[str, Any]) -> Any:
+            if args:
+                return args[0]
+            return next(iter(kwargs.values()), None)
+
+        if inspect.iscoroutinefunction(func):
+            @functools.wraps(func)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                with run(name, input=get_input(args, kwargs), **attrs) as handle:
+                    result = await func(*args, **kwargs)
+                    handle.output(result)
+                    return result
+            return async_wrapper
+
+        @functools.wraps(func)
+        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+            with run(name, input=get_input(args, kwargs), **attrs) as handle:
+                result = func(*args, **kwargs)
+                handle.output(result)
+                return result
+        return sync_wrapper
+    return decorate
+
+
 
 
 @contextlib.contextmanager
