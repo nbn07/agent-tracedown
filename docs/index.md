@@ -6,6 +6,8 @@ Your tracing tool shows what your agent did. Tracedown tells you which step brok
 
 ![A support agent promises a $120 refund; the right answer is $80. Tracedown traces the claim to an outdated refund policy at step 2 and replays the run with the current one.](demo.gif)
 
+**[Try the live demo](https://tracedown-demo.onrender.com/runs/)**: the eight demo failures, read-only, nothing to install. The free host sleeps when idle, so the first visit can take a minute.
+
 ## Start here
 
 | | |

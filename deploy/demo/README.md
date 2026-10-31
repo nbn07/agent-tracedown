@@ -1,5 +1,7 @@
 # Public demo
 
+Live at <https://tracedown-demo.onrender.com/> (Render, free tier).
+
 A read-only Tracedown with the eight demo failures loaded: what people see when they click "Try the live demo". Visitors can browse every page and re-run the analysis. They cannot send or paste runs, and nothing they do is kept: the database is created fresh on every start.
 
 The image installs the released package from PyPI, so publish the release first and keep `TRACEDOWN_VERSION` in the Dockerfile in step with it.

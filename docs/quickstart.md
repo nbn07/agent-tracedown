@@ -1,5 +1,7 @@
 # Quick start
 
+Just want to look first? The [live demo](https://tracedown-demo.onrender.com/runs/) has the same eight failures, read-only.
+
 You need Python 3.10 or newer. Nothing else: no Node, no Docker, no API key.
 
 ```bash

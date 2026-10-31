@@ -17,11 +17,11 @@ Your tracing tool shows what your agent did. Tracedown tells you which step brok
 
 **Works with** LangGraph · CrewAI · OpenAI Agents · Claude Agent SDK · Google ADK · Pydantic AI · Vercel AI SDK · MCP · Langfuse · Arize Phoenix · OpenTelemetry
 
-[Quick start](#quick-start) · [How it works](#how-it-works) · [Integrations](#integrations) · [Benchmarks](#benchmarks) · [Comparison](#comparison) · [Docs](https://nbn07.github.io/agent-tracedown/)
+**[Try the live demo](https://tracedown-demo.onrender.com/runs/)** · [Quick start](#quick-start) · [How it works](#how-it-works) · [Integrations](#integrations) · [Benchmarks](#benchmarks) · [Comparison](#comparison) · [Docs](https://nbn07.github.io/agent-tracedown/)
 
 <img src="docs/demo.gif" alt="A support agent tells a customer they will get $120 back; the real answer is $80. Every step of the run succeeded. Tracedown flags the $120 claim as coming from a stale source, walks back to step 2 (an outdated refund policy), says the agent was at fault, and replays the run from step 2 with the current policy, which gives $80." width="820">
 
-<sub>A real run from <a href="server/tracedown_server/demo/agents.py"><code>tracedown_server/demo/agents.py</code></a>. Every verdict shown is Tracedown's actual output. <a href="docs/demo/demo.mp4">Watch in HD</a>.</sub>
+<sub>A real run from <a href="server/tracedown_server/demo/agents.py"><code>tracedown_server/demo/agents.py</code></a>. Every verdict shown is Tracedown's actual output. <a href="docs/demo/demo.mp4">Watch in HD</a>, or <a href="https://tracedown-demo.onrender.com/runs/">click through it yourself</a> (the free host can take a minute to wake up).</sub>
 
 </div>
 
