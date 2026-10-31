@@ -17,9 +17,10 @@ Three packages are published from this repository, all with the same version num
    | Owner | `nbn07` | `nbn07` |
    | Repository name | `agent-tracedown` | `agent-tracedown` |
    | Workflow name | `release.yml` | `release.yml` |
-   | Environment name | `pypi` | `pypi` |
+   | Environment name | `pypi` | `pypi-server` |
 
-3. On GitHub, go to **Settings → Environments → New environment**, name it `pypi` and save. You can require your own approval before each release.
+   The environments differ on purpose: PyPI accepts only one pending publisher per repository, workflow and environment.
+3. On GitHub, go to **Settings → Environments → New environment** twice, to create `pypi` and `pypi-server`. You can require your own approval before each release; leave "Prevent self-review" off, or you can't approve your own release.
 
 A pending publisher does not reserve the name. Publish soon after setting it up.
 

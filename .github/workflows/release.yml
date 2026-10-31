@@ -4,6 +4,10 @@ name: release
 # SDK agent-tracedown to npm, when a version tag such as v0.3.0 is pushed. PyPI uses
 # trusted publishing (no token stored); npm uses the NPM_TOKEN secret if it is set.
 # One-time setup is in RELEASING.md.
+#
+# Each PyPI package publishes from its own job and GitHub environment (pypi and
+# pypi-server): PyPI allows only one pending trusted publisher per repository, workflow
+# and environment, so the two new projects need different environments.
 on:
   push:
     tags: ["v*"]
@@ -23,20 +27,33 @@ jobs:
           grep -q "\"version\": \"$tag\"" sdk/typescript/package.json
           grep -q "SDK_VERSION = \"$tag\"" sdk/typescript/src/version.ts
       - run: pip install build twine
-      - run: python -m build sdk/python --outdir dist && python -m build server --outdir dist
-      - run: twine check dist/*
+      - run: python -m build sdk/python --outdir dist/sdk && python -m build server --outdir dist/server
+      - run: twine check dist/sdk/* dist/server/*
       - uses: actions/upload-artifact@v4
-        with: { name: dist, path: dist/ }
+        with: { name: dist-sdk, path: dist/sdk/ }
+      - uses: actions/upload-artifact@v4
+        with: { name: dist-server, path: dist/server/ }
 
-  publish:
+  publish-sdk:
     needs: build
     runs-on: ubuntu-latest
-    environment: pypi
+    environment: pypi            # PyPI trusted publisher for agent-tracedown
     permissions:
       id-token: write
     steps:
       - uses: actions/download-artifact@v4
-        with: { name: dist, path: dist/ }
+        with: { name: dist-sdk, path: dist/ }
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  publish-server:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi-server     # PyPI trusted publisher for agent-tracedown-server
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: dist-server, path: dist/ }
       - uses: pypa/gh-action-pypi-publish@release/v1
 
   npm:
