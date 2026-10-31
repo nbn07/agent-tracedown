@@ -31,7 +31,7 @@ Tracedown is the flight recorder that also reads the recording. It walks back fr
 
 - **Works with what you have.** Import failed runs from Langfuse, Arize Phoenix or any OpenTelemetry exporter with no code changes, or add one line to [13 frameworks](#integrations).
 - **Explains the failure.** The root cause, the evidence, and a verdict on who was at fault: the agent, or the user.
-- **Replays with your fix.** Earlier steps come from the recording; from the broken step on, the agent runs live with your change.
+- **Replays with your fix.** Earlier steps come from the recording; from the broken step on, the agent runs live with your change. Needs a run recorded with the SDK.
 - **Runs without an LLM.** Diagnosis is rules first: instant, free and private. An inexpensive LLM judge is optional.
 - **Measured.** Accuracy on a public, human-labelled benchmark is [published](#benchmarks), losses included.
 - **Free and self-hosted.** Apache-2.0, every feature, including SSO, roles, audit log and scale-out storage.
@@ -52,6 +52,8 @@ export LANGFUSE_PUBLIC_KEY=pk-lf-... LANGFUSE_SECRET_KEY=sk-lf-...
 tracedown-import langfuse --errors-since 24h      # failed runs from the last day
 tracedown-import otlp traces.json --failed        # or any OpenTelemetry export
 ```
+
+Imported runs get the full diagnosis. Replay needs a run recorded with one of the SDKs below, because it runs your agent's own code.
 
 **Instrument your own agent.** The SDKs have no dependencies.
 
@@ -97,7 +99,7 @@ Without Docker, run `tracedown-server --db tracedown.db` and then `cd web && npm
 |---|---|---|
 | Every step of a run: model calls, tools, retrievals, memory and hand-offs. Or imported from your existing traces. | Walk back from the symptom to the root cause, with evidence, and decide who was at fault. | Re-run from the broken step with your fix. Earlier steps come from the recording, so nothing happens twice. |
 
-Every failed run gets an AI stack trace you can paste into an issue:
+[How Tracedown decides](docs/HOW-IT-DECIDES.md) walks through each stage, with its limits. Every failed run gets an AI stack trace you can paste into an issue:
 
 ```
 AgentFailureException: Invalid tool arguments
@@ -146,12 +148,15 @@ Tracedown also exports: OTLP to Jaeger, Tempo, Datadog or any collector, and Pro
 
 [Who&When](realworld/whowhen/README.md) (ICML 2025) asks which step caused each of 184 failed multi-agent runs, labelled by people. Exact match, one run, no tuning on this data:
 
-| Found the exact step | Algorithm-generated | Hand-crafted |
+| Right step | First guess<br/><sub>algorithm · hand-crafted</sub> | In top three<br/><sub>algorithm · hand-crafted</sub> |
 |---|---|---|
-| **Tracedown with an LLM judge** (Claude Haiku 5.5) | **36.5%** | **20.7%** |
-| Tracedown, rules only | 21.4% | 19.0% |
-| Baseline: first failure-looking output | 23.0% | 15.5% |
-| Best GPT-4o method in the paper | 16.6% | 8.8% |
+| **Tracedown with an LLM judge** (Claude Haiku 5.5) | **36.5% · 20.7%** | **50.8% · 32.8%** |
+| Tracedown, rules only | 21.4% · 19.0% | 33.3% · 31.0% |
+| Baseline: first failure-looking output | 23.0% · 15.5% | – |
+| Baseline: random step | 12.0% · 4.2% | 36.0% · 12.5% |
+| Best GPT-4o method in the paper | 16.6% · 8.8% | – |
+
+The first guess is wrong more often than it is right, so treat it as the first place to look and check the evidence. On the algorithm-generated set, rules alone do no better than a random pick within the top three; the judge is what lifts it. [How Tracedown decides](docs/HOW-IT-DECIDES.md) explains the method and where it fails.
 
 On [τ-bench](realworld/README.md) failures, a simple rule ("blame the first database change") beats Tracedown's first guess, 74% to 68%; Tracedown's top three contain the right step 81% of the time. The method and every change after the first scoring are in [LABELING.md](realworld/LABELING.md). The judge's answers are saved in the repository, so re-scoring needs no API key.
 
@@ -227,7 +232,7 @@ helm install tracedown deploy/helm/tracedown
 
 </details>
 
-**Documentation:** [Deployment](docs/DEPLOYMENT.md) · [Configuration](docs/CONFIGURATION.md) · [Design](docs/DESIGN.md) · [Langfuse tutorial](docs/tutorials/langfuse.md) · [Python SDK](sdk/python/README.md) · [TypeScript SDK](sdk/typescript/README.md) · [Telemetry spec](spec/)
+**Documentation:** [How it decides](docs/HOW-IT-DECIDES.md) · [Deployment](docs/DEPLOYMENT.md) · [Configuration](docs/CONFIGURATION.md) · [Design](docs/DESIGN.md) · [Langfuse tutorial](docs/tutorials/langfuse.md) · [Python SDK](sdk/python/README.md) · [TypeScript SDK](sdk/typescript/README.md) · [Telemetry spec](spec/)
 
 ## Roadmap
 
