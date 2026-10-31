@@ -7,13 +7,15 @@
 
 ### Find the step that caused your AI agent's failure.
 
-Tracedown is an open-source AI agent debugger. It finds the root cause of a failed run, says whether the agent or the user was at fault, and replays the run with your fix. It works on top of the traces you already have.
+Your tracing tool shows what your agent did. Tracedown tells you which step broke it, shows the evidence, and replays the run with your fix. Open source, and it works on top of the traces you already have.
 
 [![CI](https://github.com/nbn07/agent-tracedown/actions/workflows/ci.yml/badge.svg)](https://github.com/nbn07/agent-tracedown/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/agent-tracedown-server?label=PyPI)](https://pypi.org/project/agent-tracedown-server/)
 [![npm](https://img.shields.io/npm/v/agent-tracedown?label=npm)](https://www.npmjs.com/package/agent-tracedown)
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)](sdk/python)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+
+**Works with** LangGraph · CrewAI · OpenAI Agents · Claude Agent SDK · Google ADK · Pydantic AI · Vercel AI SDK · MCP · Langfuse · Arize Phoenix · OpenTelemetry
 
 [Quick start](#quick-start) · [How it works](#how-it-works) · [Integrations](#integrations) · [Benchmarks](#benchmarks) · [Comparison](#comparison) · [Docs](docs/)
 
@@ -158,7 +160,7 @@ Tracedown also exports: OTLP to Jaeger, Tempo, Datadog or any collector, and Pro
 
 The first guess is wrong more often than it is right, so treat it as the first place to look and check the evidence. On the algorithm-generated set, rules alone do no better than a random pick within the top three; the judge is what lifts it. [How Tracedown decides](docs/HOW-IT-DECIDES.md) explains the method and where it fails.
 
-On [τ-bench](realworld/README.md) failures, a simple rule ("blame the first database change") beats Tracedown's first guess, 74% to 68%; Tracedown's top three contain the right step 81% of the time. The method and every change after the first scoring are in [LABELING.md](realworld/LABELING.md). The judge's answers are saved in the repository, so re-scoring needs no API key.
+On [τ-bench](realworld/README.md) failures, Tracedown's first guess ties a simple rule ("blame the first database change") at 74%, and its top three contain the right step 81% of the time. It used to lose 68% to 74%; the fix was found on the development split and scored once on the test split. The method and every change after the first scoring are in [LABELING.md](realworld/LABELING.md). The judge's answers are saved in the repository, so re-scoring needs no API key.
 
 ## Comparison
 
@@ -243,6 +245,10 @@ helm install tracedown deploy/helm/tracedown
 - **Write-back to Langfuse and Phoenix**, so the verdict appears in the tool you already use
 
 Ideas are welcome in [Discussions](https://github.com/nbn07/agent-tracedown/discussions); requests with a real failing run behind them get priority.
+
+## Using Tracedown?
+
+If Tracedown found a bug for you, or you run it at work, say so in [Show and tell](https://github.com/nbn07/agent-tracedown/discussions/categories/show-and-tell). With your permission your team's name goes here. It is the most useful thing you can do for the project after reporting a wrong diagnosis.
 
 ## Contributing
 

@@ -1,0 +1,318 @@
+{
+ "resourceSpans": [
+  {
+   "resource": {
+    "attributes": [
+     {
+      "key": "service.name",
+      "value": {
+       "stringValue": "support-bot"
+      }
+     }
+    ]
+   },
+   "scopeSpans": [
+    {
+     "scope": {
+      "name": "openinference.instrumentation.openai"
+     },
+     "spans": [
+      {
+       "traceId": "5b8efff798038103d269b633813fc60c",
+       "spanId": "a000000000000001",
+       "name": "SupportAgent",
+       "kind": 1,
+       "startTimeUnixNano": "1761800000000000000",
+       "endTimeUnixNano": "1761800006000000000",
+       "attributes": [
+        {
+         "key": "openinference.span.kind",
+         "value": {
+          "stringValue": "AGENT"
+         }
+        },
+        {
+         "key": "input.value",
+         "value": {
+          "stringValue": "Hi, I'm Dana (dana@example.com). Please refund order #1002, the blender arrived broken."
+         }
+        },
+        {
+         "key": "output.value",
+         "value": {
+          "stringValue": "Your refund for order #1001 has been issued. It will reach your card in 3-5 days."
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       }
+      },
+      {
+       "traceId": "5b8efff798038103d269b633813fc60c",
+       "spanId": "a000000000000002",
+       "name": "ChatCompletion",
+       "kind": 1,
+       "startTimeUnixNano": "1761800000100000000",
+       "endTimeUnixNano": "1761800000800000000",
+       "attributes": [
+        {
+         "key": "openinference.span.kind",
+         "value": {
+          "stringValue": "LLM"
+         }
+        },
+        {
+         "key": "llm.model_name",
+         "value": {
+          "stringValue": "gpt-4.1-mini"
+         }
+        },
+        {
+         "key": "llm.token_count.prompt",
+         "value": {
+          "intValue": "412"
+         }
+        },
+        {
+         "key": "llm.token_count.completion",
+         "value": {
+          "intValue": "18"
+         }
+        },
+        {
+         "key": "llm.input_messages.0.message.role",
+         "value": {
+          "stringValue": "system"
+         }
+        },
+        {
+         "key": "llm.input_messages.0.message.content",
+         "value": {
+          "stringValue": "You are a support agent. Look up orders before refunding."
+         }
+        },
+        {
+         "key": "llm.input_messages.1.message.role",
+         "value": {
+          "stringValue": "user"
+         }
+        },
+        {
+         "key": "llm.input_messages.1.message.content",
+         "value": {
+          "stringValue": "Hi, I'm Dana (dana@example.com). Please refund order #1002, the blender arrived broken."
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.role",
+         "value": {
+          "stringValue": "assistant"
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.tool_calls.0.tool_call.function.name",
+         "value": {
+          "stringValue": "list_orders"
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.tool_calls.0.tool_call.function.arguments",
+         "value": {
+          "stringValue": "{\"email\": \"dana@example.com\"}"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       },
+       "parentSpanId": "a000000000000001"
+      },
+      {
+       "traceId": "5b8efff798038103d269b633813fc60c",
+       "spanId": "a000000000000003",
+       "name": "list_orders",
+       "kind": 1,
+       "startTimeUnixNano": "1761800000900000000",
+       "endTimeUnixNano": "1761800001100000000",
+       "attributes": [
+        {
+         "key": "openinference.span.kind",
+         "value": {
+          "stringValue": "TOOL"
+         }
+        },
+        {
+         "key": "tool.name",
+         "value": {
+          "stringValue": "list_orders"
+         }
+        },
+        {
+         "key": "input.value",
+         "value": {
+          "stringValue": "{\"email\": \"dana@example.com\"}"
+         }
+        },
+        {
+         "key": "output.value",
+         "value": {
+          "stringValue": "{\"orders\": [{\"id\": \"#1001\", \"item\": \"toaster\", \"status\": \"delivered\"}, {\"id\": \"#1002\", \"item\": \"blender\", \"status\": \"delivered\"}]}"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       },
+       "parentSpanId": "a000000000000001"
+      },
+      {
+       "traceId": "5b8efff798038103d269b633813fc60c",
+       "spanId": "a000000000000004",
+       "name": "ChatCompletion",
+       "kind": 1,
+       "startTimeUnixNano": "1761800001200000000",
+       "endTimeUnixNano": "1761800002000000000",
+       "attributes": [
+        {
+         "key": "openinference.span.kind",
+         "value": {
+          "stringValue": "LLM"
+         }
+        },
+        {
+         "key": "llm.model_name",
+         "value": {
+          "stringValue": "gpt-4.1-mini"
+         }
+        },
+        {
+         "key": "llm.token_count.prompt",
+         "value": {
+          "intValue": "530"
+         }
+        },
+        {
+         "key": "llm.token_count.completion",
+         "value": {
+          "intValue": "22"
+         }
+        },
+        {
+         "key": "llm.input_messages.0.message.role",
+         "value": {
+          "stringValue": "tool"
+         }
+        },
+        {
+         "key": "llm.input_messages.0.message.content",
+         "value": {
+          "stringValue": "{\"orders\": [{\"id\": \"#1001\", \"item\": \"toaster\"}, {\"id\": \"#1002\", \"item\": \"blender\"}]}"
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.role",
+         "value": {
+          "stringValue": "assistant"
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.tool_calls.0.tool_call.function.name",
+         "value": {
+          "stringValue": "refund_order"
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.tool_calls.0.tool_call.function.arguments",
+         "value": {
+          "stringValue": "{\"order_id\": \"#1001\"}"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       },
+       "parentSpanId": "a000000000000001"
+      },
+      {
+       "traceId": "5b8efff798038103d269b633813fc60c",
+       "spanId": "a000000000000005",
+       "name": "refund_order",
+       "kind": 1,
+       "startTimeUnixNano": "1761800002100000000",
+       "endTimeUnixNano": "1761800002400000000",
+       "attributes": [
+        {
+         "key": "openinference.span.kind",
+         "value": {
+          "stringValue": "TOOL"
+         }
+        },
+        {
+         "key": "tool.name",
+         "value": {
+          "stringValue": "refund_order"
+         }
+        },
+        {
+         "key": "input.value",
+         "value": {
+          "stringValue": "{\"order_id\": \"#1001\"}"
+         }
+        },
+        {
+         "key": "output.value",
+         "value": {
+          "stringValue": "{\"refunded\": true, \"order_id\": \"#1001\", \"amount\": 39.0}"
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       },
+       "parentSpanId": "a000000000000001"
+      },
+      {
+       "traceId": "5b8efff798038103d269b633813fc60c",
+       "spanId": "a000000000000007",
+       "name": "ChatCompletion",
+       "kind": 1,
+       "startTimeUnixNano": "1761800002800000000",
+       "endTimeUnixNano": "1761800003600000000",
+       "attributes": [
+        {
+         "key": "openinference.span.kind",
+         "value": {
+          "stringValue": "LLM"
+         }
+        },
+        {
+         "key": "llm.model_name",
+         "value": {
+          "stringValue": "gpt-4.1-mini"
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.role",
+         "value": {
+          "stringValue": "assistant"
+         }
+        },
+        {
+         "key": "llm.output_messages.0.message.content",
+         "value": {
+          "stringValue": "Your refund for order #1001 has been issued. It will reach your card in 3-5 days."
+         }
+        }
+       ],
+       "status": {
+        "code": 1
+       },
+       "parentSpanId": "a000000000000001"
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

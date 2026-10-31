@@ -1,0 +1,62 @@
+# The documentation site: https://nbn07.github.io/agent-tracedown/
+# Preview: pip install "mkdocs-material==9.6.*" && mkdocs serve
+site_name: Tracedown
+site_description: Find the step that caused your AI agent's failure. Open-source root-cause analysis for AI agents.
+site_url: https://nbn07.github.io/agent-tracedown/
+repo_url: https://github.com/nbn07/agent-tracedown
+repo_name: nbn07/agent-tracedown
+edit_uri: edit/main/docs/
+copyright: Apache-2.0
+docs_dir: docs
+
+exclude_docs: |
+  brand/build_logo.py
+  demo/record.mjs
+  demo/demo.html
+  demo/.frames/
+
+theme:
+  name: material
+  logo: brand/logo-mark.svg
+  favicon: brand/logo-mark.svg
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep orange
+      accent: deep orange
+      toggle: { icon: material/weather-night, name: Dark theme }
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep orange
+      accent: deep orange
+      toggle: { icon: material/weather-sunny, name: Light theme }
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc: { permalink: true }
+  - pymdownx.highlight
+  - pymdownx.superfences:
+      custom_fences:
+        - { name: mermaid, class: mermaid, format: !!python/name:pymdownx.superfences.fence_code_format }
+
+nav:
+  - Home: index.md
+  - Quick start: quickstart.md
+  - Diagnose runs you already have: importing.md
+  - Integrations: integrations.md
+  - How Tracedown decides: HOW-IT-DECIDES.md
+  - Benchmarks: benchmarks.md
+  - Tutorials:
+      - Langfuse in 5 minutes: tutorials/langfuse.md
+  - Running Tracedown:
+      - Deployment: DEPLOYMENT.md
+      - Configuration: CONFIGURATION.md
+  - Reference:
+      - Design: DESIGN.md
+      - OpenTelemetry GenAI proposal: standards/otel-genai-proposal.md

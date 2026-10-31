@@ -1,0 +1,100 @@
+{
+ "id": "lf-trace-42",
+ "name": "research-question",
+ "timestamp": "2026-10-29T14:00:00.000Z",
+ "input": "What was Acme Corp's revenue in 2025?",
+ "output": "Acme Corp's 2025 revenue was $4.2 billion, up 12% year over year.",
+ "observations": [
+  {
+   "id": "obs-agent",
+   "traceId": "lf-trace-42",
+   "type": "AGENT",
+   "name": "ResearchAgent",
+   "startTime": "2026-10-29T14:00:00.000Z",
+   "endTime": "2026-10-29T14:00:30.000Z",
+   "level": "DEFAULT",
+   "parentObservationId": null,
+   "input": "What was Acme Corp's revenue in 2025?",
+   "output": "Acme Corp's 2025 revenue was $4.2 billion, up 12% year over year."
+  },
+  {
+   "id": "obs-plan",
+   "traceId": "lf-trace-42",
+   "type": "GENERATION",
+   "name": "plan",
+   "model": "claude-haiku-5-5",
+   "startTime": "2026-10-29T14:00:01.000Z",
+   "endTime": "2026-10-29T14:00:04.000Z",
+   "level": "DEFAULT",
+   "parentObservationId": "obs-agent",
+   "input": [
+    {
+     "role": "user",
+     "content": "What was Acme Corp's revenue in 2025?"
+    }
+   ],
+   "output": {
+    "role": "assistant",
+    "content": "I'll search for Acme Corp's 2025 annual report."
+   },
+   "usageDetails": {
+    "input": 220,
+    "output": 15
+   }
+  },
+  {
+   "id": "obs-chain",
+   "traceId": "lf-trace-42",
+   "type": "CHAIN",
+   "name": "search-chain",
+   "startTime": "2026-10-29T14:00:05.000Z",
+   "endTime": "2026-10-29T14:00:12.000Z",
+   "level": "DEFAULT",
+   "parentObservationId": "obs-agent"
+  },
+  {
+   "id": "obs-search",
+   "traceId": "lf-trace-42",
+   "type": "TOOL",
+   "name": "web_search",
+   "startTime": "2026-10-29T14:00:05.500Z",
+   "endTime": "2026-10-29T14:00:11.000Z",
+   "level": "ERROR",
+   "statusMessage": "search API timeout after 5s",
+   "parentObservationId": "obs-chain",
+   "input": {
+    "query": "Acme Corp 2025 annual revenue"
+   },
+   "output": null,
+   "metadata": {
+    "side_effects": false
+   }
+  },
+  {
+   "id": "obs-answer",
+   "traceId": "lf-trace-42",
+   "type": "GENERATION",
+   "name": "answer",
+   "model": "claude-haiku-5-5",
+   "startTime": "2026-10-29T14:00:13.000Z",
+   "endTime": "2026-10-29T14:00:20.000Z",
+   "level": "DEFAULT",
+   "parentObservationId": "obs-agent",
+   "input": [
+    {
+     "role": "user",
+     "content": "What was Acme Corp's revenue in 2025?"
+    },
+    {
+     "role": "tool",
+     "content": "error: search API timeout after 5s"
+    }
+   ],
+   "output": "Acme Corp's 2025 revenue was $4.2 billion, up 12% year over year.",
+   "usageDetails": {
+    "input": 260,
+    "output": 21
+   }
+  }
+ ]
+}

@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useRouteId } from "@/lib/route";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, GitCompare, Sparkles } from "lucide-react";
 import { api, useApi } from "@/lib/api";
 import type { Claims, RunDetail } from "@/lib/types";
@@ -36,6 +36,11 @@ export function RunDetailPage() {
   const selectedSpan = useMemo(() => data?.spans.find(s => s.span_id === selected) || null, [data, selected]);
   const steps = useMemo(() => (data?.spans || []).map(stepOf).sort((a, b) => a - b), [data]);
   const myReplays = (replays.data?.runs || []).filter(r => r.replay_of === id);
+  // When the answer itself is the problem, open on the claims, sentence by sentence.
+  const causeCategory = report?.root_cause?.category;
+  useEffect(() => {
+    if (causeCategory === "hallucination" || causeCategory === "stale_source") setTab(t => (t === "graph" ? "claims" : t));
+  }, [id, causeCategory]);
 
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (loading && !data) return <Loading rows={10} />;

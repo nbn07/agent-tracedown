@@ -30,7 +30,7 @@ from ..enterprise.pii import PolicyEngine
 from ..enterprise.rbac import Directory, Principal
 from ..enterprise.sso import OIDC, SSOError
 from ..incidents import hooks
-from ..importers import import_otlp
+from ..importers import UnknownFormat, import_any, import_otlp, parse_text
 from ..pipeline import Pipeline
 from ..rca import RunView, analyze
 from ..replay import MODES, diff, plan
@@ -41,6 +41,10 @@ STATIC = Path(__file__).resolve().parent.parent / "static"
 # The full web app, exported as static files (web/scripts/build-static.mjs) and shipped in the
 # wheel. TDN_WEB_DIR points elsewhere; an empty value turns it off.
 WEB = Path(os.environ.get("TDN_WEB_DIR", "") or Path(__file__).resolve().parent.parent / "web")
+READ_ONLY_MESSAGE = ("This is a read-only demo. To diagnose your own runs, install Tracedown: "
+                     "pip install agent-tracedown-server && tracedown up")
+IMPORT_LIMIT = int(os.environ.get("TDN_IMPORT_LIMIT_KB", "5120")) * 1024  # pasted exports
+IMPORT_MAX_RUNS = 50
 _API_PREFIXES = ("api/", "v1/", "auth/", "healthz", "metrics", "docs", "redoc", "openapi.json", "static/")
 _DETAIL_ROUTES = ("runs", "incidents")  # one prerendered page each, at <route>/_/
 
@@ -176,6 +180,17 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
 
     def actor(p: Principal) -> str:
         return p.email or p.id
+
+    # Read-only mode, for a public demo: anyone can look and re-run the analysis, nobody can
+    # write. `tracedown up --read-only` switches it on after loading the demo runs.
+    app.state.read_only = os.environ.get("TDN_READ_ONLY") == "1"
+
+    @app.middleware("http")
+    async def read_only_guard(request: Request, call_next):
+        if app.state.read_only and request.method not in ("GET", "HEAD", "OPTIONS") \
+                and not request.url.path.endswith(("/analyze", "/replay")):
+            return JSONResponse({"detail": READ_ONLY_MESSAGE}, status_code=403)
+        return await call_next(request)
 
     @app.middleware("http")
     async def audit_mutations(request: Request, call_next):
@@ -315,6 +330,39 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
     @api.get("/runs/{trace_id}/graph", tags=["visualization"])
     def get_graph(trace_id: str, p: Principal = Depends(principal)) -> Dict[str, Any]:
         return build_graph(spans_for(p, trace_id))
+
+    @api.post("/import", tags=["ingest"])
+    async def import_export(request: Request, project: str = "pasted", format: str = "auto",
+                            p: Principal = Depends(principal)) -> Dict[str, Any]:
+        """Diagnose a pasted or uploaded export: Langfuse, OTLP/JSON or a Tracedown bundle."""
+        need(p, "ingest", project)
+        rate_limit(p)
+        raw = await request.body()
+        if len(raw) > IMPORT_LIMIT:
+            raise HTTPException(413, f"export too large: {len(raw) // 1024} KB, the limit is {IMPORT_LIMIT // 1024} KB")
+        try:
+            fmt, runs = import_any(parse_text(raw.decode("utf-8", errors="replace")), format)
+        except (UnknownFormat, KeyError, TypeError, IndexError) as exc:
+            raise HTTPException(422, f"could not read this export: {exc}") from exc
+        if not runs:
+            raise HTTPException(422, "the export holds no runs")
+        out = []
+        try:
+            for trace_id, spans, blobs in runs[:IMPORT_MAX_RUNS]:
+                if blobs:
+                    pipeline.process_blobs(project, blobs)
+                store.check_ownership(project, spans)
+                pipeline.process_spans(project, spans)
+                run = store.get_run(trace_id) or {}
+                found = store.get_findings(trace_id) or {}
+                rc = found.get("root_cause") or {}
+                out.append({"trace_id": trace_id, "agent": run.get("agent_name"), "outcome": run.get("outcome"),
+                            "root_cause": rc.get("label"), "step": rc.get("step")})
+        except TraceOwnershipError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        return {"format": fmt, "project": project, "runs": out, "skipped": max(0, len(runs) - IMPORT_MAX_RUNS)}
 
     @api.post("/runs/{trace_id}/analyze", tags=["analysis"])
     def analyze_run(trace_id: str, p: Principal = Depends(principal)) -> Dict[str, Any]:
@@ -679,8 +727,8 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
         return resp
 
     @app.get("/healthz", tags=["ops"])
-    def healthz() -> Dict[str, str]:
-        return {"status": "ok", "version": __version__}
+    def healthz() -> Dict[str, Any]:
+        return {"status": "ok", "version": __version__, "read_only": bool(app.state.read_only)}
 
     app.include_router(ingest)
     app.include_router(api)

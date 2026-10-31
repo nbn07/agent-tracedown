@@ -62,7 +62,7 @@ Every finding gets a score, starting from its confidence:
 | It is a root cause found by the walk back | × 1.2 |
 | It is a symptom with a known cause | × 0.8, so the cause ranks above it |
 | A document or memory read that no later step used | × 0.6, since it cannot have caused the failure |
-| A wording problem in a run that also changed something (refund, booking) | × 0.7, since the action is the likelier cause |
+| A wording problem in a run that also changed something (refund, booking) | × 0.7, and never above the best finding on a tool call, since the action is the likelier cause |
 
 Scores are capped at 0.99. The top finding is the verdict; the next ones are shown as alternatives. **Scores are rule weights, not calibrated probabilities.** A 0.88 means "strong evidence of this kind", not "88% likely".
 
@@ -104,13 +104,13 @@ This is how the demo traces "$120" back to an outdated refund policy. Matching i
 
 ## Replay
 
-Replay runs your agent again from the blamed step, with your fix. Steps before it come from the recording; from that step on, the agent runs live. Replay runs inside your agent's code through the SDK, so it needs a run recorded with the [Python](../sdk/python/README.md) or [TypeScript](../sdk/typescript/README.md) SDK. Runs imported from Langfuse or OpenTelemetry get the full diagnosis, but cannot be replayed on their own.
+Replay runs your agent again from the blamed step, with your fix. Steps before it come from the recording; from that step on, the agent runs live. Replay runs inside your agent's code through the SDK, so it needs a run recorded with the [Python](https://github.com/nbn07/agent-tracedown/blob/main/sdk/python/README.md) or [TypeScript](https://github.com/nbn07/agent-tracedown/blob/main/sdk/typescript/README.md) SDK. Runs imported from Langfuse or OpenTelemetry get the full diagnosis, but cannot be replayed on their own.
 
-Tracedown does not write the fix yet. You write it; replay shows whether it works. Suggested and proven fixes are on the [roadmap](../README.md#roadmap).
+Tracedown does not write the fix yet. You write it; replay shows whether it works. Suggested and proven fixes are on the [roadmap](https://github.com/nbn07/agent-tracedown#roadmap).
 
 ## How often it is right
 
-On [Who&When](../realworld/whowhen/README.md), a public benchmark of 184 failed multi-agent runs labelled by people:
+On [Who&When](https://github.com/nbn07/agent-tracedown/blob/main/realworld/whowhen/README.md), a public benchmark of 184 failed multi-agent runs labelled by people:
 
 | | Right step, first guess | Right step in top three |
 |---|---|---|
@@ -119,13 +119,13 @@ On [Who&When](../realworld/whowhen/README.md), a public benchmark of 184 failed 
 
 The two numbers are the algorithm-generated and hand-crafted sets. In plain terms: **the first guess is wrong more often than it is right.** Use the verdict as the first place to look, check the evidence, and look at the next two findings if it does not fit. On the hand-crafted set, the top three contain the right step about a third of the time.
 
-The full tables, including baselines, are in the [README](../README.md#benchmarks).
+The full tables, including baselines, are in the [README](https://github.com/nbn07/agent-tracedown#benchmarks).
 
 ## Where it goes wrong
 
 - **Long multi-agent runs where the mistake is a judgement call.** Most errors in Who&When are of this kind. Rules have little to go on, and the judge is right only some of the time.
 - **Values that change shape.** The link step needs exact matches. If a model rewrites "2026-11-06" as "6 November", the link is lost.
 - **Paraphrased claims.** Word matching misses claims that are right but worded differently.
-- **The first failure is often the answer.** On τ-bench, "blame the first database change" beats Tracedown's first guess (74% to 68%).
+- **The first failure is often the answer.** On τ-bench, "blame the first database change" is right 74% of the time. Tracedown's first guess only ties it, so on runs like these the rules add little beyond that prior.
 
 If Tracedown blames the wrong step on one of your runs, please [report it](https://github.com/nbn07/agent-tracedown/issues/new?template=wrong-diagnosis.yml). Every report becomes a test case for later versions.

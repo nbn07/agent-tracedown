@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, AlertTriangle, BarChart3, GitCompare, ListTree, Network, Radio, Menu, X } from "lucide-react";
+import { Activity, AlertTriangle, BarChart3, FileUp, GitCompare, ListTree, Network, Radio, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/cn";
 import { ThemeToggle } from "./theme";
@@ -15,6 +15,7 @@ const items = [
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/live", label: "Live", icon: Radio },
   { href: "/diff", label: "Compare runs", icon: GitCompare },
+  { href: "/import", label: "Diagnose a trace", icon: FileUp },
 ];
 
 function Brand() {

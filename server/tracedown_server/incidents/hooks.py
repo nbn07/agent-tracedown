@@ -63,7 +63,11 @@ def http_transport(url: str, headers: Dict[str, str], body: Dict[str, Any]) -> T
 # ----------------------------------------------------------------------------- payloads
 
 def _link(base_url: str, kind: str, ident: Any) -> str:
-    return f"{base_url.rstrip('/')}/#/{kind}/{ident}" if base_url else ""
+    """A link into the web app: /incidents/<id>/ and /drift/?id=<id>."""
+    if not base_url:
+        return ""
+    base = base_url.rstrip("/")
+    return f"{base}/drift/?id={ident}" if kind == "drift" else f"{base}/{kind}/{ident}/"
 
 
 def _summary(event: str, obj: Dict[str, Any]) -> str:

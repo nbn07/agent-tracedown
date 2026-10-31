@@ -15,7 +15,7 @@ Every setting is an environment variable prefixed `TDN_`. The same variables wor
 | `TDN_CLICKHOUSE` | ClickHouse URL, or JSON router config for multi-cluster |
 | `TDN_KAFKA_BOOTSTRAP` | Ingest through Kafka/Redpanda; run `tracedown-worker`. The topic is created if missing (`TDN_KAFKA_PARTITIONS`, default 12) |
 | `TDN_OTLP_FORWARD`, `TDN_OTLP_HEADERS` | Forward finished runs to an OTLP endpoint |
-| `TDN_PRICES` | Extra or corrected model prices, USD per million tokens, as JSON or a path to a JSON file: `{"model": {"input": .., "output": ..}}`. Current Anthropic, OpenAI and Google models are priced out of the box ([sources](../server/tracedown_server/pricing.py)) |
+| `TDN_PRICES` | Extra or corrected model prices, USD per million tokens, as JSON or a path to a JSON file: `{"model": {"input": .., "output": ..}}`. Current Anthropic, OpenAI and Google models are priced out of the box ([sources](https://github.com/nbn07/agent-tracedown/blob/main/server/tracedown_server/pricing.py)) |
 | `TDN_DRIFT_MIN_RUNS` | Runs per cohort before a drift report (default 20) |
 | `TDN_PUBLIC_URL` | Used in notification links and the cookie `secure` flag |
 

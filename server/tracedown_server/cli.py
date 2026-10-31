@@ -58,8 +58,10 @@ def up(args: argparse.Namespace) -> int:
     if not _port_free(args.host, args.port):
         print(f"Port {args.port} is in use. Try: tracedown up --port {args.port + 1}", file=sys.stderr)
         return 1
-    url = f"http://{args.host}:{args.port}"
-    server = uvicorn.Server(uvicorn.Config(create_app(), host=args.host, port=args.port, log_level="warning"))
+    local = "127.0.0.1" if args.host in ("0.0.0.0", "::", "") else args.host  # where this process reaches itself
+    url = f"http://{local}:{args.port}"
+    app = create_app()
+    server = uvicorn.Server(uvicorn.Config(app, host=args.host, port=args.port, log_level="warning"))
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
     if not _wait_until_up(url, server):
@@ -70,9 +72,14 @@ def up(args: argparse.Namespace) -> int:
         print("Loading the demo runs …", flush=True)
         from .demo.runner import load
         load(url, verbose=False)
+    if args.read_only:
+        app.state.read_only = True  # after loading the demo: from now on, nobody can write
 
     page = url + "/runs/" if web_available() else url + "/"
-    print(f"\nTracedown is running at {url}   (data: {os.path.abspath(args.db)})")
+    where = f"   (listening on {args.host}:{args.port})" if local != args.host else ""
+    print(f"\nTracedown is running at {url}{where}   (data: {os.path.abspath(args.db)})")
+    if args.read_only:
+        print("Read-only: every write is refused from now on.")
     if not web_available():
         print("This install has no bundled web app, so you get the simple viewer. For the full one: "
               "cd web && npm install && npm run dev")
@@ -107,6 +114,8 @@ def main(argv=None) -> int:
     u.add_argument("--db", default=os.environ.get("TDN_DB", "tracedown.db"), help="SQLite file (default: ./tracedown.db)")
     u.add_argument("--no-demo", action="store_true", help="do not load the demo runs into an empty database")
     u.add_argument("--no-open", action="store_true", help="do not open a browser")
+    u.add_argument("--read-only", action="store_true",
+                   help="refuse every write once the demo runs are loaded (for a public demo)")
     u.set_defaults(func=up)
 
     d = sub.add_parser("demo", help="print the demo agents' diagnoses in the terminal, no server")
