@@ -1,1 +1,113 @@
-IyBEaWFnbm9zZSB5b3VyIExhbmdmdXNlIGZhaWx1cmVzIGluIDUgbWludXRlcwoKQSBzdGVwLWJ5LXN0ZXAgd2Fsa3Rocm91Z2ggdG8gaW1wb3J0IGV4aXN0aW5nIExhbmdmdXNlIHRyYWNlcyBpbnRvIFRyYWNlZG93biBhbmQgZ2V0IGFuIEFJIHN0YWNrIHRyYWNlIHRoYXQgcG9pbnRzIHRvIHRoZSByb290IGNhdXNlLgoKTm8gYWNjb3VudCBpcyByZXF1aXJlZCBmb3IgdGhlIHNhbXBsZS4gUmVhbCBMYW5nZnVzZSBjcmVkZW50aWFscyBhcmUgb25seSBuZWVkZWQgZm9yIHRoZSBsaXZlIGZldGNoIHN0ZXAuCgojIyAxLiBJbnN0YWxsCgpGcm9tIGEgY2xvbmUgb2YgdGhpcyByZXBvc2l0b3J5OgoKYGBgYmFzaApnaXQgY2xvbmUgaHR0cHM6Ly9naXRodWIuY29tL25ibjA3L2FnZW50LXRyYWNlZG93biAmJiBjZCBhZ2VudC10cmFjZWRvd24KcGlwIGluc3RhbGwgLi9zZGsvcHl0aG9uIC4vc2VydmVyCmBgYAoKT25jZSB0aGUgcGFja2FnZSBpcyBvbiBQeVBJIHRoZSBjYW4gdXNlIGBwaXAgaW5zdGFsbCBhZ2VudC10cmFjZWRvd24tc2VydmVyYCBpbnN0ZWFkLgoKIyMgMi4gVHJ5IHRoZSBzYW1wbGUgZXhwb3J0IChubyBhY2NvdW50KQoKU2FtcGxlIExhbmdmdXNlIHRyYWNlcyBsaXZlIGluIGBleGFtcGxlcy9pbXBvcnRzL2A6CgpgYGBiYXNoCnRyYWNlZG93bi1pbXBvcnQgbGFuZ2Z1c2UtZmlsZSBleGFtcGxlcy9pbXBvcnRzL2xhbmdmdXNlLXRyYWNlLmpzb24KYGBgCgpZb3Ugc2hvdWxkIHNlZSBhbiBBSSBzdGFjayB0cmFjZSBzaW1pbGFyIHRvOgoKYGBgCuKUlCBSeXNlYXJjaEFnZW50IMO2IHRyYWNlIGxmLXRyYWNlLTQyIMO2IDQgc3RlcHMgwrcgZmFpbHVyZQpBZ2VudEZhaWx1cmVFeGNlcHRpb246IFVuc3VwcG9ydGVkIGNsYWltIChoYWxsdWNpbmF0aW9uKQogIHJ1biAgICAgIGxmLXRyYWNl4oCmICBSZXNlYXJjaEFnZW50ICAyMDI2LTEwLTI5IDE0OjAwIFVUQwogIGF0ICAgICAgIHN0ZXAgMyAgUmVzZWFyY2hBZ2VudCDihpIgYW5zd2VyCiAgICAgICAgICAgICAxIG9mIDEgYW5zd2VyIGNsYWltcyBub3Qgc3VwcG9ydGVkIGJ5IGFueSBzb3VyY2UKICByb290IGNhdXNlOiBVbnN1cHBvcnRlZCBjbGFpbSAoaGFsbHVjaW5hdGlvbikgKGNvbmZpZGVuY2UgMC43NSkKICBldmlkZW5jZTogICB1bnN1cHBvcnRlZDogIkFjbWUgQ29ycCdzIDIwMjUgcmV2ZW51ZSB3YXMgJDQuMiBiaWxsaW9uLCB1cCAxMiUgeWVhciBvdmVyIHllYXIuIiAobnVtYmVyKHMpIDEyLCA0LjIgYXBwZWFyIGluIG5vIHNvdXJjZSkKICBhbHNvOiAgICAgICBUb29sIGZhaWx1cmUgKHN0ZXAgMiwgMC4zMCkKICBuZXh0OiAgICAgICByZXBsYXkgZnJvbSBzdGVwIDMgd2l0aCB5b3VyIGZpeDogdGRuLnJlcGxheShidW5kbGUsIG1vZGU9ImZyb20tc3RlcCIsIGZyb21fc3RlcD0zKQpgYGAKCiMjIyBXaGF0IGVhY2ggbGluZSBtZWFucwoKLSAqKkhlYWRlcioqIOKAlCBhZ2VudCBuYW1lLCB0cnVuY2F0ZWQgdHJhY2UgaWQsIHN0ZXAgY291bnQsIGFuZCBvdXRjb21lIChmYWlsdXJlIC8gc3VjY2VzcykuCi0gKipFeGNlcHRpb24gdHlwZSoqIOKAlCB0aGUgaGlnaC1sZXZlbCBkaWFnbm9zaXMgKGhlcmUgYW4gdW5zdXBwb3J0ZWQgY2xhaW0gLyBoYWxsdWNpbmF0aW9uKS4KLSAqKmF0IHN0ZXAgTioqIOKAlCB0aGUgc3RlcCB3aGVyZSB0aGUgc3ltcHRvbSB3YXMgb2JzZXJ2ZWQuCi0gKipjYXVzZWQgYnkgLyByb290IGNhdXNlKiog4oCUIHRoZSBlYXJsaWVyIHN0ZXAgdGhhdCBwcm9kdWNlZCB0aGUgYmFkIHZhbHVlLCB3aXRoIGEgY29uZmlkZW5jZSBzY29yZS4KLSAqKmV2aWRlbmNlKiog4oCUIGNvbmNyZXRlIGZhY3RzIGEgaHVtYW4gY2FuIGNoZWNrIChxdW90ZWQgdGV4dCwgbWlzc2luZyBudW1iZXJzLCBlcnJvciBtZXNzYWdlcykuCi0gKiphbHNvKiog4oCUIHNlY29uZGFyeSBmaW5kaW5ncy4KLSAqKm5leHQqKiDigJQgc3VnZ2VzdGVkIG5leHQgYWN0aW9uLCB1c3VhbGx5IGEgcmVwbGF5IGZyb20gdGhlIGJyb2tlbiBzdGVwLgoKIyMgMy4gQ29ubmVjdCBhIHJlYWwgTGFuZ2Z1c2UgcHJvamVjdAoKRXhwb3J0IHRoZSBwdWJsaWMgYW5kIHNlY3JldCBrZXlzIGZyb20geW91ciBMYW5nZnVzZSBwcm9qZWN0IHNldHRpbmdzIChjbG91ZCBvciBzZWxmLWhvc3RlZCk6CgpgYGBiYXNoCmV4cG9ydCBMQU5HRlVTRV9QVUJMSUNfS0VZPXBrLWxmLS4uLgpl eHBvcnQgTEFOR0ZVU0VfU0VDUkVUX0tFWT1zay1sZi0uLi4KIyBvcHRpb25hbCBmb3Igc2VsZi1ob3N0ZWQKZXhwb3J0IExBTkdGVVhFX0hPU1Q9aHR0cHM6Ly95b3VyLWxhbmdmdXNlLmV4YW1wbGUuY29tCmBgYAoKRmV0Y2ggZXZlcnkgdHJhY2UgdGhhdCBjb250YWlucyBhbiBFUlJPUiBvYnNlcnZhdGlvbiBpbiB0aGUgbGFzdCAyNCBob3VyczoKCmBgYGJhc2gKdHJhY2Vkb3duLWltcG9ydCBsYW5nZnVzZSAtLWVycm9ycy1zaW5jZSAyNGgKYGBgCgpVc2VmdWwgZmxhZ3MgKHNlZSBgdHJhY2Vkb3duLWltcG9ydCBsYW5nZnVzZSAtLWhlbHBgIGZvciB0aGUgZnVsbCBsaXN0KToKCi0gYC0tbGltaXQgNTBgIOKAlCBjYXAgdGhlIG51bWJlciBvZiB0cmFjZXMKLSBgLS10cmFjZS1pZCA8aWQ+YCDigJQgaW1wb3J0IG9uZSBzcGVjaWZpYyB0cmFjZQotIGAtLWZhaWxlZGAgLyBgLS1zdWNjZWVkZWRgIOKAlCBmb3JjZSB0aGUgb3V0Y29tZSBsYWJlbAotIGAtLXNhdmUgcnVucy5qc29ubGAg4oCUIGFsc28gd3JpdGUgdGhlIHJ1bnMgYXMgSlNPTiBsaW5lcwotIGAtLXF1aWV0YCDigJQgc3VwcHJlc3MgdGhlIHByaW50ZWQgYW5hbHlzaXMKCiMjIDQuIE9wdGlvbmFsOiBzZW5kIHRvIGEgVHJhY2Vkb3duIHNlcnZlcgoKU3RhcnQgYSBsb2NhbCBzZXJ2ZXIgKG5vIERvY2tlciByZXF1aXJlZCk6CgpgYGBiYXNoCnRyYWNlZG93bi1zZXJ2ZXIgLS1kYiBkZW1vLmRiCmBgYAoKVGhlbiByZS1ydW4gdGhlIGltcG9ydCB3aXRoIGAtLXNlbmRgOgoKYGBgYmFzaAp0cmFjZWRvd24taW1wb3J0IGxhbmdmdXNlLWZpbGUgZXhhbXBsZXMvaW1wb3J0cy9sYW5nZnVzZS10cmFjZS5qc29uIFwKICAtLXNlbmQgaHR0cDovL2xvY2FsaG9zdDo3MDcwCmBgYAoKT3BlbiB0aGUgd2ViIGFwcCAoaW4gYW5vdGhlciB0ZXJtaW5hbCk6CgpgYGBiYXNoCmNkIHdlYiAmJiBucG0gaW5zdGFsbCAmJiBucG0gcnVuIGRldgpgYGAKClZpc2l0IGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMCB0byBicm93c2UgdGhlIGltcG9ydGVkIHJ1bnMsIHN0YWNrIHRyYWNlcywgYW5kIGV2aWRlbmNlLgoKIyMgNS4gT3B0aW9uYWw6IExMTSBqdWRnZQoKUnVsZXMtb25seSBkaWFnbm9zaXMgaXMgZnJlZSBhbmQgcHJpdmF0ZS4gRm9yIHNoYXJwZXIgcmVzdWx0cyBvbiBhbWJpZ3VvdXMgY2FzZXMgYWRkIGFuIGluZXhwZW5zaXZlIGp1ZGdlOgoKYGBgYmFzaAp0cmFjZWRvd24taW1wb3J0IGxhbmdmdXNlLWZpbGUgZXhhbXBsZXMvaW1wb3J0cy9sYW5nZnVzZS10cmFjZS5qc29uIFwKICAtLWp1ZGdlIGFudGhyb3BpYzpjbGF1ZGUtaGFpa3UtNS01CmBgYAoKKFJlcXVpcmVzIHRoZSBjb3JyZXNwb25kaW5nIHByb3ZpZGVyIEFQSSBrZXkgaW4gdGhlIGVudmlyb25tZW50LikuCgojIyBGdXJ0aGVyIHJlYWRpbmcKCi0gQ0xJIHNvdXJjZSBhbmQgZXZlcnkgZmxhZzogYHNlcnZlci90cmFjZWRvd25fc2VydmVyL2ltcG9ydGVycy9jbGkucHlgCi0gUkVBRE1FIHNlY3Rpb24g4oCcQi4gRGlhZ25vc2UgdGhlIHJ1bnMgeW91IGFscmVhZHkgaGF2ZeKAnQotIE90aGVyIHNhbXBsZSBleHBvcnRzIGluIGBleGFtcGxlcy9pbXBvcnRzL2AK
+# Diagnose your Langfuse failures in 5 minutes
+
+A step-by-step walkthrough to import existing Langfuse traces into Tracedown and get an AI stack trace that points to the root cause.
+
+No account is required for the sample. Real Langfuse credentials are only needed for the live fetch step.
+
+## 1. Install
+
+From a clone of this repository:
+
+```bash
+git clone https://github.com/nbn07/agent-tracedown && cd agent-tracedown
+pip install ./sdk/python ./server
+```
+
+Once the package is on PyPI you can use `pip install agent-tracedown-server` instead.
+
+## 2. Try the sample export (no account)
+
+Sample Langfuse traces live in `examples/imports/`:
+
+```bash
+tracedown-import langfuse-file examples/imports/langfuse-trace.json
+```
+
+You should see an AI stack trace similar to:
+
+```
+━━ ResearchAgent · trace lf-trace-42 · 4 steps · failure
+AgentFailureException: Unsupported claim (hallucination)
+  run      lf-trace…  ResearchAgent  2026-10-29 14:00 UTC
+  at        step 3  ResearchAgent → answer
+              1 of 1 answer claims not supported by any source
+  root cause: Unsupported claim (hallucination) (confidence 0.75)
+  evidence:   unsupported: "Acme Corp's 2025 revenue was $4.2 billion, up 12% year over year." (number(s) 12, 4.2 appear in no source)
+  also:       Tool failure (step 2, 0.30)
+  next:       replay from step 3 with your fix: tdn.replay(bundle, mode="from-step", from_step=3)
+```
+
+### What each line means
+
+- **Header** — agent name, truncated trace id, step count, and outcome (failure / success).
+- **Exception type** — the high-level diagnosis (here an unsupported claim / hallucination).
+- **at step N** — the step where the symptom was observed.
+- **caused by / root cause** — the earlier step that produced the bad value, with a confidence score.
+- **evidence** — concrete facts a human can check (quoted text, missing numbers, error messages).
+- **also** — secondary findings.
+- **next** — suggested next action, usually a replay from the broken step.
+
+## 3. Connect a real Langfuse project
+
+Export the public and secret keys from your Langfuse project settings (cloud or self-hosted):
+
+```bash
+export LANGFUSE_PUBLIC_KEY=pk-lf-...
+export LANGFUSE_SECRET_KEY=sk-lf-...
+# optional for self-hosted
+export LANGFUSE_HOST=https://your-langfuse.example.com
+```
+
+Fetch every trace that contains an ERROR observation in the last 24 hours:
+
+```bash
+tracedown-import langfuse --errors-since 24h
+```
+
+Useful flags (see `tracedown-import langfuse --help` for the full list):
+
+- `--limit 50` — cap the number of traces
+- `--trace-id <id>` — import one specific trace
+- `--failed` / `--succeeded` — force the outcome label
+- `--save runs.jsonl` — also write the runs as JSON lines
+- `--quiet` — suppress the printed analysis
+
+## 4. Optional: send to a Tracedown server
+
+Start a local server (no Docker required):
+
+```bash
+tracedown-server --db demo.db
+```
+
+Then re-run the import with `--send`:
+
+```bash
+tracedown-import langfuse-file examples/imports/langfuse-trace.json \
+  --send http://localhost:7070
+```
+
+Open the web app (in another terminal):
+
+```bash
+cd web && npm install && npm run dev
+```
+
+Visit http://localhost:3000 to browse the imported runs, stack traces, and evidence.
+
+## 5. Optional: LLM judge
+
+Rules-only diagnosis is free and private. For sharper results on ambiguous cases add an inexpensive judge:
+
+```bash
+tracedown-import langfuse-file examples/imports/langfuse-trace.json \
+  --judge anthropic:claude-haiku-5-5
+```
+
+(Requires the corresponding provider API key in the environment.)
+
+## Further reading
+
+- CLI source and every flag: `server/tracedown_server/importers/cli.py`
+- README section “B. Diagnose the runs you already have”
+- Other sample exports in `examples/imports/`
