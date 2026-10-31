@@ -67,3 +67,30 @@ def test_read_only_refuses_writes_but_allows_reading_and_analysis(client):
     assert client.post("/v1/ingest/spans", json={"project": "x", "spans": []}).status_code == 403
     assert client.get(f"/api/v1/runs/{tid}").status_code == 200
     assert client.post(f"/api/v1/runs/{tid}/analyze").status_code == 200
+
+
+def test_locked_database_gives_a_readable_error(client, monkeypatch):
+    import sqlite3
+
+    def locked(*a, **k):
+        raise sqlite3.OperationalError("attempt to write a readonly database")
+    monkeypatch.setattr(client.app.state.store, "put_blobs", locked)
+    r = client.post("/api/v1/import", content=sample("langfuse-trace.json"))
+    assert r.status_code == 503 and "OneDrive" in r.json()["detail"]
+
+
+def test_unexpected_errors_are_json(client, monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("kaput")
+    monkeypatch.setattr(client.app.state.pipeline, "process_spans", boom)
+    c = TestClient(client.app, raise_server_exceptions=False)
+    r = c.post("/api/v1/import", content=sample("langfuse-trace.json"))
+    assert r.status_code == 500 and "RuntimeError: kaput" in r.json()["detail"]
+
+
+def test_synced_folders_are_recognized():
+    from tracedown_server import cli
+    assert cli.synced_folder("/Users/n/Library/CloudStorage/OneDrive-Personal/x/tracedown.db")
+    assert cli.synced_folder("/Users/n/Dropbox/t.db")
+    assert not cli.synced_folder("/Users/n/.tracedown/tracedown.db")
+    assert cli.default_db().endswith("/.tracedown/tracedown.db")

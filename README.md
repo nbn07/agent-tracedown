@@ -47,6 +47,8 @@ pip install agent-tracedown-server
 tracedown up                                      # http://127.0.0.1:7070
 ```
 
+Needs Python 3.10+. A Mac's built-in Python is 3.9; with [uv](https://docs.astral.sh/uv/) instead: `uvx --python 3.12 --from agent-tracedown-server tracedown up`.
+
 Prefer the terminal? `tracedown demo` prints every diagnosis instead.
 
 **Diagnose the runs you already have.** No code changes: paste an export into **Diagnose a trace** in the web app, or import from the command line. A [5-minute tutorial](docs/tutorials/langfuse.md) walks through it.

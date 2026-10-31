@@ -49,7 +49,30 @@ def _port_free(host: str, port: int) -> bool:
     return True
 
 
+# Folders kept in sync by a cloud drive. Their sync clients lock files while uploading, and
+# SQLite then fails with "attempt to write a readonly database".
+_SYNCED = ("/library/cloudstorage/", "/onedrive", "/dropbox", "/google drive", "/mobile documents/", "/icloud")
+
+
+def default_db() -> str:
+    """A database next to the user's home, not the current folder (which may be synced)."""
+    home = os.path.join(os.path.expanduser("~"), ".tracedown")
+    return os.path.join(home, "tracedown.db")
+
+
+def synced_folder(path: str) -> bool:
+    p = os.path.abspath(path).replace("\\", "/").lower()
+    return any(m in p for m in _SYNCED)
+
+
 def up(args: argparse.Namespace) -> int:
+    args.db = os.path.expanduser(args.db)
+    if args.db != ":memory:":
+        os.makedirs(os.path.dirname(os.path.abspath(args.db)), exist_ok=True)
+        if synced_folder(args.db):
+            print(f"Warning: {args.db} is in a cloud-synced folder (OneDrive, iCloud, Dropbox or Google Drive).\n"
+                  "Sync can lock the file and make writes fail. Use a local path, for example "
+                  "--db ~/.tracedown/tracedown.db", file=sys.stderr)
     os.environ["TDN_DB"] = args.db
     import uvicorn
 
@@ -111,7 +134,8 @@ def main(argv=None) -> int:
     u = sub.add_parser("up", help="start the server and web app, with demo runs, and open the browser")
     u.add_argument("--host", default=os.environ.get("TDN_HOST", "127.0.0.1"))
     u.add_argument("--port", type=int, default=int(os.environ.get("TDN_PORT", "7070")))
-    u.add_argument("--db", default=os.environ.get("TDN_DB", "tracedown.db"), help="SQLite file (default: ./tracedown.db)")
+    u.add_argument("--db", default=os.environ.get("TDN_DB") or default_db(),
+                   help="SQLite file (default: ~/.tracedown/tracedown.db)")
     u.add_argument("--no-demo", action="store_true", help="do not load the demo runs into an empty database")
     u.add_argument("--no-open", action="store_true", help="do not open a browser")
     u.add_argument("--read-only", action="store_true",

@@ -34,4 +34,4 @@ body:
     id: framework
     attributes:
       label: Framework and Tracedown version
-      placeholder: LangGraph 1.2, agent-tracedown 0.4.0, LLM judge on/off
+      placeholder: LangGraph 1.2, agent-tracedown 0.4.1, LLM judge on/off

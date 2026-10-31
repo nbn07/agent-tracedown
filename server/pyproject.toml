@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-tracedown-server"
-version = "0.4.0"
+version = "0.4.1"
 description = "Tracedown server and CLI: root-cause analysis for AI agent runs, importers for Langfuse and OpenTelemetry, replay planning and a web viewer."
 readme = "README.md"
 requires-python = ">=3.10"

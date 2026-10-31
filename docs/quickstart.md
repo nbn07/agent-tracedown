@@ -7,7 +7,15 @@ pip install agent-tracedown-server
 tracedown up
 ```
 
-`tracedown up` starts the server and the web app on <http://127.0.0.1:7070>, loads eight demo agents that fail in different ways, and opens your browser. Your data is kept in `tracedown.db` in the current folder.
+`tracedown up` starts the server and the web app on <http://127.0.0.1:7070>, loads eight demo agents that fail in different ways, and opens your browser. Your data is kept in `~/.tracedown/tracedown.db`.
+
+On a Mac, the built-in `python3` is 3.9, too old for Tracedown, and pip then says it finds no matching version. [uv](https://docs.astral.sh/uv/) fetches a newer Python for you:
+
+```bash
+uvx --python 3.12 --from agent-tracedown-server tracedown up
+```
+
+Keep the database out of OneDrive, iCloud, Dropbox and Google Drive folders: their sync clients lock the file and writes fail. The default location is safe.
 
 ## What to look at
 
@@ -31,7 +39,7 @@ Also try **Incidents** (failures grouped by cause), **Drift** (a prompt change t
 ```bash
 tracedown up --no-demo          # start empty, for your own runs
 tracedown up --port 8080        # another port
-tracedown up --db team.db       # another database file
+tracedown up --db ~/team.db     # another database file
 tracedown demo                  # print the demo diagnoses in the terminal, no server
 ```
 

@@ -11,7 +11,9 @@ belongs to. State-changing calls and payload reads are written to the audit log.
 from __future__ import annotations
 
 import json
+import logging
 import os
+import sqlite3
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -37,6 +39,7 @@ from ..replay import MODES, diff, plan
 from ..storage import SQLiteStore, TraceOwnershipError
 from .views import build_graph, build_tree, merge_graphs
 
+log = logging.getLogger("tracedown")
 STATIC = Path(__file__).resolve().parent.parent / "static"
 # The full web app, exported as static files (web/scripts/build-static.mjs) and shipped in the
 # wheel. TDN_WEB_DIR points elsewhere; an empty value turns it off.
@@ -163,6 +166,22 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
     ingest_queue = None if queue is False else queue if queue is not None else queue_from_env(pipeline.process_spans)
 
     app = FastAPI(title="Tracedown", version=__version__, description="The flight recorder for AI agents.")
+
+    @app.exception_handler(sqlite3.OperationalError)
+    async def sqlite_error(request: Request, exc: sqlite3.OperationalError):
+        log.error("database error on %s %s: %s", request.method, request.url.path, exc)
+        if "readonly" in str(exc):
+            return JSONResponse(status_code=503, content={"detail": (
+                "The database file cannot be written. If it is in a OneDrive, iCloud, Dropbox or Google Drive "
+                "folder, the sync client may have locked it: restart with a local path, for example "
+                "`tracedown up --db ~/.tracedown/tracedown.db`. Otherwise check the file's permissions.")})
+        return JSONResponse(status_code=500, content={"detail": f"database error: {exc}"})
+
+    @app.exception_handler(Exception)
+    async def unexpected_error(request: Request, exc: Exception):
+        log.exception("unexpected error on %s %s", request.method, request.url.path)
+        return JSONResponse(status_code=500, content={
+            "detail": f"Internal error ({type(exc).__name__}: {str(exc)[:200]}). The full error is in the server's log."})
     app.state.store, app.state.pipeline, app.state.directory, app.state.audit = store, pipeline, directory, audit
     app.state.cache = cache
 
