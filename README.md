@@ -54,6 +54,16 @@ The demo needs no API keys. It runs agents that fail in realistic ways:
 
 It then repeats one failure to open an incident, ships a prompt change that triggers a drift report, and replays a failure with a fix. Open the UI to explore runs, incidents, drift, analytics and the live feed.
 
+### Who is at fault?
+
+Not every failed run is an agent bug. Every failed run gets a verdict: `agent`, `user` (the user's details matched no account, or they declined), or `unfinished` (the run stopped while the agent was waiting). When it isn't the agent, the stack trace says so:
+
+```
+  fault:      the user, not the agent (0.80): the user's details matched no account: 3 lookups failed and none succeeded
+```
+
+The rules are deliberately cautious: right in 2 of 2 cases on a small check, but they catch only a minority of user-caused failures. With `TDN_JUDGE` set, an LLM judge decides the harder cases, such as the user choosing the wrong item themselves. That judge is not yet measured.
+
 ## Already recording with Langfuse, Phoenix or OpenTelemetry?
 
 Diagnose the runs you already have, with no code changes. Everything runs locally unless you add `--send`.

@@ -186,6 +186,14 @@ def analyze(spans: List[Dict[str, Any]], blobs: Dict[str, str], judge: Any = _NO
         "root_cause": out[0] if out else None,
         "dataflow": {k: sorted(v) for k, v in upstream.items()},
     }
+    from .fault import attribute_fault, judge_fault
+    report["fault"] = attribute_fault(run, out)
+    fault_judge = J_default() if judge is _NO_JUDGE else judge
+    if report["fault"] is not None and fault_judge is not None and report["fault"]["confidence"] < 0.8:
+        judged_fault = judge_fault(run, fault_judge)
+        if judged_fault is not None:
+            judged_fault["rules"] = {k: report["fault"][k] for k in ("verdict", "reason")}
+            report["fault"] = judged_fault
     report["stack_trace"] = render_stack_trace(report, run)
     return report
 
@@ -211,6 +219,10 @@ def render_stack_trace(report: Dict[str, Any], run: RunView) -> str:
     lines = [f"AgentFailureException: {lead['label']}", head, frame(lead, "at")]
     if symptom is not None:
         lines.append(frame(top, "caused by"))
+    fault = report.get("fault")
+    if fault and fault["verdict"] in ("user", "unfinished"):
+        who = {"user": "the user, not the agent", "unfinished": "nobody yet: the run was unfinished"}[fault["verdict"]]
+        lines.append(f"  fault:      {who} ({fault['confidence']:.2f}): {fault['reason']}")
     lines.append(f"  root cause: {top['label']} (confidence {top['confidence']:.2f})")
     for ev in top["evidence"][:3]:
         lines.append(f"  evidence:   {ev}")
@@ -219,6 +231,11 @@ def render_stack_trace(report: Dict[str, Any], run: RunView) -> str:
         lines.append("  also:       " + "; ".join(f"{f['label']} (step {f['step']}, {f['confidence']:.2f})" for f in others[:3]))
     lines.append(f"  next:       tracedown replay {report['trace_id'][:8]} --from-step {top['step']}")
     return "\n".join(lines)
+
+
+def J_default():
+    from .judge import default_judge
+    return default_judge()
 
 
 def _ask_judge(run: RunView, ranked: List[Finding], score, judge: Any, n: int) -> Optional[Finding]:

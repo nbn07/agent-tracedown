@@ -404,3 +404,98 @@ def test_point_of_no_return_on_outcome_failure(mem):
     tid = _failed_refund_run(mem)
     rep = analyze(mem.trace(tid), mem.blobs, judge=None)
     assert rep["root_cause"]["category"] == "unverified_action" and rep["root_cause"]["step"] == 3
+
+
+# ----------------------------------------------------------------------------- who is at fault
+
+def _support_run(mem, turns, fail="customer goal not met"):
+    """turns: list of ("user", text) | ("agent", text) | ("tool", name, args, result_or_Exception)."""
+    t = tdn.ManualTrace("SupportBot", input=turns[0][1])
+    t.declare_tools([{"name": "find_user_id_by_email", "side_effects": False},
+                     {"name": "cancel_order", "side_effects": True}])
+    pending, k = [], 0
+    for turn in turns:
+        k += 1
+        if turn[0] == "user":
+            pending.append({"role": "user", "content": turn[1]})
+        elif turn[0] == "agent":
+            t.start(f"l{k}", "chat m", "llm", input=list(pending))
+            t.end(f"l{k}", output={"text": turn[1]})
+            pending = []
+        else:
+            _, name, args, res = turn
+            t.start(f"t{k}", f"execute_tool {name}", "tool", input=args, attrs={"gen_ai.tool.name": name})
+            if isinstance(res, Exception):
+                t.end(f"t{k}", error=str(res))
+            else:
+                t.end(f"t{k}", output=res)
+    t.finish(output=turns[-1][1], error=fail)
+    return t.trace_id
+
+
+def test_fault_user_details_match_no_account(mem):
+    tid = _support_run(mem, [
+        ("user", "Hi, cancel my order please. My email is sam@nowhere.com"),
+        ("agent", "Let me find your account."),
+        ("tool", "find_user_id_by_email", {"email": "sam@nowhere.com"}, RuntimeError("user not found")),
+        ("agent", "I couldn't find that email. Could you check it?"),
+        ("user", "Try sam@elsewhere.com"),
+        ("agent", "Checking."),
+        ("tool", "find_user_id_by_email", {"email": "sam@elsewhere.com"}, RuntimeError("user not found")),
+        ("agent", "I'm sorry, I still can't find an account, so I can't make changes."),
+    ])
+    rep = analyze(mem.trace(tid), mem.blobs, judge=None)
+    assert rep["fault"]["verdict"] == "user" and "matched no account" in rep["fault"]["reason"]
+    assert "fault:      the user, not the agent" in rep["stack_trace"]
+
+
+def test_fault_agent_when_the_agent_acted(mem):
+    tid = _support_run(mem, [
+        ("user", "Cancel order #2 please, my email is ann@x.com"),
+        ("agent", "Looking you up."),
+        ("tool", "find_user_id_by_email", {"email": "ann@x.com"}, {"user_id": "ann"}),
+        ("agent", "Cancelling order #1."),
+        ("tool", "cancel_order", {"order_id": "#1"}, {"ok": True}),
+        ("agent", "Order #1 is cancelled."),
+    ])
+    assert analyze(mem.trace(tid), mem.blobs, judge=None)["fault"]["verdict"] == "agent"
+
+
+def test_fault_decline_is_only_a_hint(mem):
+    tid = _support_run(mem, [
+        ("user", "My order is late."),
+        ("agent", "I can cancel it for you. Would you like me to proceed?"),
+        ("user", "No, I'll keep it and wait."),
+        ("agent", "Understood, the order stays as it is."),
+    ])
+    f = analyze(mem.trace(tid), mem.blobs, judge=None)["fault"]
+    assert f["verdict"] != "user" and any("declined" in h for h in f["hints"])
+
+
+def test_fault_unfinished_when_waiting_on_the_user(mem):
+    tid = _support_run(mem, [
+        ("user", "I want to change my flight."),
+        ("agent", "Sure. Which date would you like to fly instead?"),
+    ])
+    assert analyze(mem.trace(tid), mem.blobs, judge=None)["fault"]["verdict"] == "unfinished"
+
+
+def test_fault_llm_judge_overrides_weak_rules(mem):
+    tid = _support_run(mem, [
+        ("user", "Exchange my earbuds for the cheapest pair."),
+        ("agent", "Here are the options: A ($99), B ($79). Which one?"),
+        ("user", "A please, that's the one I want."),
+        ("agent", "Exchanging for A."),
+        ("tool", "cancel_order", {"order_id": "#9"}, {"ok": True}),
+        ("agent", "Done."),
+    ])
+    calls = []
+
+    def judge(prompt):
+        calls.append(prompt)
+        if "who caused the failure" in prompt:
+            return '{"fault": "user", "confidence": 0.8, "explanation": "the user picked A themselves"}'
+        return "{}"
+    f = analyze(mem.trace(tid), mem.blobs, judge=judge)["fault"]
+    assert f["verdict"] == "user" and f["source"] == "llm_judge" and f["rules"]["verdict"] == "agent"
+    assert any("TOOL cancel_order" in p for p in calls)

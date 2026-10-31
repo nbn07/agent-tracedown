@@ -252,7 +252,9 @@ def investigate(run, judge: Optional[Judge] = None) -> Dict[str, Any]:
         topical = [u for sc, _, u in scored if sc >= 0.35] or units
         missing_nums = sorted(n for n in nums if not any(n in u.nums for u in topical))
         rationale = ""
-        if (len(content) <= 2 and not nums) or (_COURTESY.search(c.text) and not nums):
+        # a question asserts nothing (unless it quotes a figure: "the $99 one?")
+        is_question = c.text.rstrip().endswith("?")
+        if (len(content) <= 2 and not nums) or ((_COURTESY.search(c.text) or is_question) and not nums):
             label = "no_claim"
         elif missing_nums and best is not None and best_score >= 0.4 and best.nums - nums:
             label = "contradicted"

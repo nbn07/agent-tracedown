@@ -159,3 +159,27 @@ On the 31 runs with a Copilot-checked step:
 The sample is small, so these differences are within noise. Two conclusions:
 - Report τ-bench numbers only with this caveat; Who&When (human labels) is the stronger benchmark.
 - A useful product feature follows: telling "the agent made a mistake" apart from "the user caused it" and "nothing went wrong".
+
+## "Who is at fault?" verdict, 2026-10-30
+
+Every failed run now gets a verdict: `agent`, `user` (the user caused it) or `unfinished` (nothing went wrong yet). The rules were written from the trace alone, with no expected answers. They were checked by reading dev runs (no labels) and then scored once on the 48 Copilot-labelled runs with a decided verdict.
+
+Truth comes from the Copilot labels, with a mapping fixed before scoring:
+- Wrong with kind "Customer caused it" → user.
+- Wrong with kind "Something else" and a note saying there was no real mistake → nobody.
+- Anything else → agent.
+
+That gives 34 agent, 12 user and 2 nobody.
+
+| Rules | Accuracy | "user" found | "user" right when said |
+|---|---|---|---|
+| First scoring (three rules) | 73% | 3 of 12 | 3 of 5 |
+| After making the "user declined" rule a hint only | 75% | 2 of 12 | 2 of 2 |
+| Always "agent" | 71% | 0 | n/a |
+
+- **"The user declined" rule.** It was wrong twice in three: a "no" to a side question, such as extra bags, is not a refusal of the task. It now adds a hint and never decides the verdict. That change was made on the same 48 runs, so its precision is unproven.
+- **What decides the verdict now.** Only "the user's details matched no account" (2 of 2 correct).
+- **What the rules cannot see.** Most user-caused failures are semantic: the user picked the wrong item, or confirmed the wrong card. The optional LLM judge asks who caused the failure. It is implemented and tested, but not yet measured, because that needs an API key.
+- **Score it yourself:** `python realworld/label-check/score_fault.py --show`.
+
+Along the way, a question in the agent's last turn ("Which date would you like?") was counted as an unsupported claim. A question without a figure is no longer a claim. This changed none of the benchmark numbers above.
