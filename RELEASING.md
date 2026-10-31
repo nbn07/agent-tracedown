@@ -26,12 +26,14 @@ A pending publisher does not reserve the name. Publish soon after setting it up.
 
 ### npm (for the TypeScript SDK)
 
-1. Create an account at [npmjs.com](https://www.npmjs.com/signup) and turn on two-factor authentication.
-2. Go to **Access Tokens → Generate New Token → Granular Access Token**. Give it read and write access to packages, and copy it.
-3. On GitHub, go to **Settings → Secrets and variables → Actions → New repository secret**. Name it `NPM_TOKEN` and paste the token.
-4. Go to **Settings → Environments → New environment**, name it `npm` and save.
+npm uses trusted publishing too: no token is stored.
 
-After the first release you can switch to npm trusted publishing (package settings on npmjs.com → **Trusted publishing** → GitHub Actions, workflow `release.yml`, environment `npm`) and delete the token.
+1. Create an account at [npmjs.com](https://www.npmjs.com/signup) and turn on two-factor authentication.
+2. On GitHub, go to **Settings → Environments → New environment**, name it `npm` and save.
+3. On npmjs.com, open the package → **Settings → Trusted Publisher → GitHub Actions**, and enter owner `nbn07`, repository `agent-tracedown`, workflow `release.yml`, environment `npm`. Allow **npm publish**.
+4. Optional, recommended: package **Settings → Publishing access → Require two-factor authentication and disallow tokens**.
+
+A trusted publisher can only be added to a package that already exists. Version 0.3.0 was published once with a short-lived token for that reason; the token has been deleted. A brand-new package would need the same first step.
 
 ## Each release
 

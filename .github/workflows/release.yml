@@ -1,8 +1,9 @@
 name: release
 
 # Publishes agent-tracedown (SDK) and agent-tracedown-server to PyPI, and the TypeScript
-# SDK agent-tracedown to npm, when a version tag such as v0.3.0 is pushed. PyPI uses
-# trusted publishing (no token stored); npm uses the NPM_TOKEN secret if it is set.
+# SDK agent-tracedown to npm, when a version tag such as v0.3.0 is pushed. Both registries
+# use trusted publishing: they accept uploads only from this workflow in the named GitHub
+# environment, and no token is stored anywhere.
 # One-time setup is in RELEASING.md.
 #
 # Each PyPI package publishes from its own job and GitHub environment (pypi and
@@ -62,15 +63,17 @@ jobs:
     environment: npm
     permissions:
       contents: read
-      id-token: write   # npm provenance: the package page links back to this build
+      id-token: write   # trusted publishing and provenance: npm checks this workflow's identity
     defaults:
       run:
         working-directory: sdk/typescript
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "22", registry-url: "https://registry.npmjs.org" }
+        with: { node-version: "24", registry-url: "https://registry.npmjs.org" }
+      # trusted publishing needs npm 11.5.1 or later
+      - run: npm install -g npm@11 && npm --version
       - run: npm ci && npm run build && npm test
+      # no token: npm accepts this upload because the package's trusted publisher is
+      # nbn07/agent-tracedown, workflow release.yml, environment npm
       - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
