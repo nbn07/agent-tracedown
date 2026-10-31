@@ -12,10 +12,10 @@ span table:
 * user feedback score when the SDK reports one (``run.feedback(score)``);
 * daily time series.
 
-Cost: the SDK may report ``tdn.llm.cost_usd`` per call (exact). Otherwise cost is
-tokens × the price table, set with ``TDN_PRICES`` (JSON, USD per million tokens) or
-``PUT /api/v1/settings/prices``. No prices ship by default because they change; runs on
-models without a price report cost as unknown rather than zero.
+Cost: see ``pricing``. A reported ``tdn.llm.cost_usd`` wins; otherwise tokens × the
+built-in price table for current Anthropic, OpenAI and Google models, overridden by
+``TDN_PRICES`` and ``PUT /api/v1/settings/prices``. Runs that used a model with no known
+price report their cost as unknown rather than zero.
 """
 from __future__ import annotations
 
@@ -25,6 +25,8 @@ import time
 from collections import Counter, defaultdict
 from typing import Any, Dict, List, Optional
 
+from . import pricing
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS settings (
     key    TEXT PRIMARY KEY,
@@ -33,45 +35,37 @@ CREATE TABLE IF NOT EXISTS settings (
 """
 
 
-def get_prices(store) -> Dict[str, Dict[str, float]]:
-    rows = store.query("SELECT value FROM settings WHERE key='prices'")
-    if rows:
-        return json.loads(rows[0]["value"])
-    return json.loads(os.environ.get("TDN_PRICES", "{}"))
+def user_prices(store) -> Dict[str, Dict[str, Any]]:
+    """Prices saved through the API (they override the built-in table and ``TDN_PRICES``)."""
+    try:
+        rows = store.query("SELECT value FROM settings WHERE key='prices'")
+    except Exception:  # noqa: BLE001 - a bare store without the settings table
+        return {}
+    return json.loads(rows[0]["value"]) if rows else {}
 
 
-def set_prices(store, prices: Dict[str, Dict[str, float]]) -> Dict[str, Dict[str, float]]:
-    for model, p in prices.items():
-        if not {"input", "output"} <= set(p) or any(not isinstance(p[k], (int, float)) or p[k] < 0
-                                                     for k in ("input", "output")):
-            raise ValueError(f"{model}: need non-negative 'input' and 'output' USD per million tokens")
+def get_prices(store) -> Dict[str, Dict[str, Any]]:
+    """Effective price table: built-in, then ``TDN_PRICES``, then saved prices."""
+    return pricing.merged(user_prices(store))
+
+
+def set_prices(store, prices: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """Save price overrides (merged over the built-in table; an empty object clears them)."""
+    pricing.validate(prices)
     store.execute("INSERT INTO settings(key, value) VALUES ('prices', ?) "
                   "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (json.dumps(prices),))
     return prices
 
 
-def _price_for(prices: Dict[str, Dict[str, float]], model: Optional[str]) -> Optional[Dict[str, float]]:
-    if not model:
-        return None
-    if model in prices:
-        return prices[model]
-    # Dated snapshots ("gpt-4o-mini-2024-07-18") fall back to the longest matching prefix.
-    best = max((m for m in prices if model.startswith(m)), key=len, default=None)
-    return prices.get(best) if best else None
+def _price_for(prices: Dict[str, Dict[str, Any]], model: Optional[str]) -> Optional[Dict[str, Any]]:
+    return pricing.price_for(prices, model)
 
 
-def run_cost(profile: Dict[str, Any], prices: Dict[str, Dict[str, float]]) -> Optional[float]:
-    total, known = 0.0, True
-    for call in profile["features"].get("llm", []):
-        if call.get("cost_usd") is not None:
-            total += float(call["cost_usd"])
-            continue
-        p = _price_for(prices, call.get("model"))
-        if p is None:
-            known = False
-            continue
-        total += call["input_tokens"] / 1e6 * p["input"] + call["output_tokens"] / 1e6 * p["output"]
-    return round(total, 6) if known else None
+def run_cost(profile: Dict[str, Any], prices: Dict[str, Dict[str, Any]],
+             at_ns: Optional[int] = None) -> Optional[float]:
+    """Cost of a run in USD, or None when any model call in it has no known price."""
+    c = pricing.run_cost_from_profile(profile, prices, at_ns)
+    return c["cost_usd"] if c["cost_complete"] else None
 
 
 def _pct(xs: List[float], q: float) -> Optional[float]:
@@ -97,7 +91,7 @@ def overview(store, project: Optional[str] = None, agent: Optional[str] = None,
         f = [r["profile"]["features"] for r in rs]
         n = len(f)
         ok = sum(x["outcome"] == "success" for x in f)
-        costs = [run_cost(r["profile"], prices) for r in rs]
+        costs = [run_cost(r["profile"], prices, r["started_at"]) for r in rs]
         known = [c for c in costs if c is not None]
         answered = [x["claims"] for x in f if x.get("claims") and x["claims"]["claims"] > 0
                     and x["claims"]["evidence_units"] > 1]
@@ -146,14 +140,19 @@ def overview(store, project: Optional[str] = None, agent: Optional[str] = None,
         "reached_answer_rate": round(e["used"] / e["used_known"], 4) if e["used_known"] else None,
     } for src, e in sorted(retr.items())]
 
-    daily: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"runs": 0, "failures": 0, "cost_usd": 0.0})
+    daily: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"runs": 0, "failures": 0, "cost_usd": 0.0,
+                                                           "cost_by_agent": defaultdict(float)})
     for r in runs:
         day = time.strftime("%Y-%m-%d", time.gmtime(r["started_at"] / 1e9))
         d = daily[day]
         d["runs"] += 1
         d["failures"] += r["profile"]["features"]["outcome"] == "failure"
-        c = run_cost(r["profile"], prices)
-        d["cost_usd"] = round(d["cost_usd"] + (c or 0), 6)
+        # priced steps count even when another step in the run has no price
+        c = pricing.run_cost_from_profile(r["profile"], prices, r["started_at"])["cost_usd"] or 0
+        d["cost_usd"] = round(d["cost_usd"] + c, 6)
+        d["cost_by_agent"][r["agent_name"]] += c
+    for d in daily.values():
+        d["cost_by_agent"] = {a: round(v, 6) for a, v in sorted(d["cost_by_agent"].items())}
 
     return {
         "window_days": days, "project": project, "agent": agent,
@@ -162,6 +161,7 @@ def overview(store, project: Optional[str] = None, agent: Optional[str] = None,
         "tools": store.tool_stats(project, since),
         "retrieval": retrieval,
         "daily": [{"day": k, **v} for k, v in sorted(daily.items())],
+        "models": pricing.by_model(runs, prices),
         "prices_configured": sorted(prices),
     }
 
@@ -192,11 +192,9 @@ def prometheus(store, project: Optional[str] = None) -> str:
         for call in f.get("llm", []):
             c_tok[(call.get("model") or "unknown", "input")] += call["input_tokens"]
             c_tok[(call.get("model") or "unknown", "output")] += call["output_tokens"]
-            p = _price_for(prices, call.get("model"))
-            if call.get("cost_usd") is not None:
-                c_cost[call.get("model") or "unknown"] += float(call["cost_usd"])
-            elif p:
-                c_cost[call.get("model")] += call["input_tokens"] / 1e6 * p["input"] + call["output_tokens"] / 1e6 * p["output"]
+            usd, _ = pricing.call_cost(call, prices, call.get("at_ns") or r.get("started_at"))
+            if usd is not None:
+                c_cost[call.get("model") or "unknown"] += usd
         cl = f.get("claims")
         if cl and cl["unsupported"] + cl["contradicted"] > 0:
             c_hall[(r["project"], r["agent_name"])] += 1

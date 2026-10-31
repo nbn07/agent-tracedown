@@ -84,9 +84,12 @@ class SQLiteStore:
         with self._lock:
             self._db.executescript(ddl)
 
-    def execute(self, sql: str, args: Iterable[Any] = ()) -> int:
+    def execute(self, sql: str, args: Iterable[Any] = ()) -> Optional[int]:
+        """Run one statement; for an INSERT, return the new row id (None if nothing was inserted)."""
         with self._lock, self._db:
             cur = self._db.execute(sql, tuple(args))
+            if cur.rowcount == 0 and sql.lstrip()[:6].upper() == "INSERT":
+                return None  # ON CONFLICT DO NOTHING skipped it; lastrowid would be stale
             return cur.lastrowid
 
     def query(self, sql: str, args: Iterable[Any] = ()) -> List[Dict[str, Any]]:

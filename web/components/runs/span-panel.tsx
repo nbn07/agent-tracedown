@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import type { RootCause, Span } from "@/lib/types";
 import { kindOf, shortName, stepOf } from "@/lib/kinds";
 import { Badge } from "@/components/ui/badge";
-import { ms } from "@/lib/format";
+import { ms, num, usd } from "@/lib/format";
 
 function Payload({ label, digest, traceId }: { label: string; digest: string | null; traceId: string }) {
   const [state, setState] = useState<{ v?: unknown; err?: string; loading: boolean }>({ loading: Boolean(digest) });
@@ -45,6 +45,11 @@ export function SpanPanel({ span, findings, onClose }: { span: Span; findings: R
       <div className="flex flex-wrap gap-2 text-xs">
         <Badge tone={span.status.code === "ERROR" ? "bad" : "ok"}>{span.status.code === "ERROR" ? "error" : "ok"}</Badge>
         <span className="text-muted tabular">{ms(((span.end_time || span.start_time) - span.start_time) / 1e6)}</span>
+        {span.kind === "llm" && (
+          <span className="text-muted tabular" title={span.cost_source === "reported" ? "Cost reported by the caller" : span.cost_source === "computed" ? "Tokens × the model's list price" : "No known price for this model"}>
+            {num(Number(span.attributes["gen_ai.usage.input_tokens"] ?? 0))} in · {num(Number(span.attributes["gen_ai.usage.output_tokens"] ?? 0))} out · {span.cost_usd != null ? usd(span.cost_usd) : "no price"}
+          </span>
+        )}
         {mine.map(f => <Badge key={f.id} tone={f.root_cause ? "cause" : "neutral"}>{f.label}</Badge>)}
       </div>
       {span.status.message && <p className="rounded-md bg-bad-soft px-2.5 py-1.5 text-xs text-bad break-words">{span.status.message}</p>}

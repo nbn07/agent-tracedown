@@ -23,6 +23,8 @@ import time
 from collections import Counter
 from typing import Any, Dict, List, Optional
 
+from .. import pricing
+
 DIMENSIONS = ("prompt_version", "model", "tool_schema", "kb_snapshot", "release")
 
 SCHEMA = """
@@ -94,10 +96,10 @@ def build_profile(spans: List[Dict[str, Any]], findings: Optional[Dict[str, Any]
             "categories": sorted({f["category"] for f in (findings or {}).get("findings", [])}),
             "claims": (claims or {}).get("summary"),
             "retrieval": _retrieval_usage(retr, findings),
-            "llm": [{"model": s["attributes"].get("gen_ai.request.model"),
-                     "input_tokens": int(s["attributes"].get("gen_ai.usage.input_tokens") or 0),
-                     "output_tokens": int(s["attributes"].get("gen_ai.usage.output_tokens") or 0),
-                     "cost_usd": s["attributes"].get("tdn.llm.cost_usd")} for s in llm],
+            "llm": [{**pricing.call_usage(s["attributes"]),
+                     "model": s["attributes"].get("gen_ai.request.model") or s["attributes"].get("gen_ai.response.model"),
+                     "at_ns": s["start_time"]} for s in llm],
+            "run_cost_usd": ra.get("tdn.run.cost_usd"),
             "feedback": ra.get("tdn.feedback.score"),
         },
     }

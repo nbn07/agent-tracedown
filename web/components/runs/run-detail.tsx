@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { ArrowLeft, GitCompare, Sparkles } from "lucide-react";
 import { api, useApi } from "@/lib/api";
 import type { Claims, RunDetail } from "@/lib/types";
-import { ms, num, short, when } from "@/lib/format";
+import { ms, num, runCost, short, when } from "@/lib/format";
 import { stepOf } from "@/lib/kinds";
 import { Badge, outcomeTone } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -58,6 +58,7 @@ export function RunDetailPage() {
           <span className="font-mono">{run.trace_id}</span>
           <span>{run.project}</span><span>{when(run.started_at)}</span>
           <span className="tabular">{run.span_count} steps · {ms(run.duration_ms)} · {num((run.input_tokens || 0) + (run.output_tokens || 0))} tokens</span>
+          {run.cost_usd != null && <span className="tabular" title={run.cost_complete === false ? `${run.unpriced_calls} model call(s) have no known price and are not included` : "Cost of the model calls in this run"}>{runCost(run)}</span>}
           {run.models?.length > 0 && <span>{run.models.join(", ")}</span>}
         </div>
         <div className="mt-2 flex flex-wrap gap-2">

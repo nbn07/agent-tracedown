@@ -6,14 +6,16 @@
 
 Agents fail quietly. A model writes "Friday" where a date belongs. A retriever returns last year's policy. A loop burns 40 tool calls. A run looks fine but books the wrong flight. The error, if there is one, shows up several steps later. Tracedown records every step and walks back from the symptom to the cause:
 
-- **Sits on top of the tracing you already use.** Point it at the failures you already record in **Langfuse**, **Arize Phoenix** or any **OpenTelemetry** exporter, with no code changes. Or add one line to LangGraph, the OpenAI Agents SDK, CrewAI, AutoGen, Semantic Kernel or LlamaIndex.
+- **Sits on top of the tracing you already use.** Point it at the failures you already record in **Langfuse**, **Arize Phoenix** or any **OpenTelemetry** exporter, with no code changes. Or add one line to LangGraph, the OpenAI Agents SDK, the Claude Agent SDK, Google ADK, Pydantic AI, MCP, CrewAI, AutoGen, Semantic Kernel, LlamaIndex or the Vercel AI SDK. SDKs for **Python** and **TypeScript**.
 - **Measured, not just claimed.** Its accuracy on a public, human-labelled benchmark is published below, including where a simple rule beats it. Anyone can rerun the scores without an API key.
 - **Works without an LLM.** The diagnosis is rules first: local, instant, free and private. An inexpensive judge model is optional and makes it sharper.
 - **AI stack traces.** Every failed run gets a pasteable report: where it surfaced, what caused it, the evidence, and the step to replay from.
 - **"Who is at fault?"** A verdict on every failed run: the agent, the user, or nobody yet, because many "agent failures" turn out to be the user's.
 - **Replay with a fix.** Earlier steps come from the recording, and from the step you choose onward the agent runs live with your change.
 
-Self-hosted, Apache-2.0, and every feature is free, including the enterprise ones: single sign-on, roles, audit log, PII policies and scale-out storage. There is no paid edition. The SDK has no dependencies.
+It also shows what each run cost in dollars, with current Anthropic, OpenAI and Google prices built in.
+
+Self-hosted, Apache-2.0, and every feature is free, including the enterprise ones: single sign-on, roles, audit log, PII policies and scale-out storage. There is no paid edition. Neither SDK has any dependencies.
 
 ## Try it in a minute
 
@@ -115,19 +117,44 @@ with tdn.run("CalendarAssistant", input=user_msg, prompt_version="extract@v3") a
     run.output(answer)
 ```
 
+### TypeScript
+
+```bash
+npm install agent-tracedown
+```
+
+```ts
+import * as tdn from "agent-tracedown";
+tdn.init({ project: "support-bot", endpoint: "http://localhost:7070" });
+
+await tdn.run("CalendarAssistant", { input: userMsg }, async run => {
+  const out = await tdn.llmCall(callModel, { model: "gpt-4o-mini", prompt: messages });
+  await tdn.toolCall("calendar_create_event", args, createEvent, { schema: SCHEMA });
+  run.output(answer);
+});
+```
+
+The TypeScript SDK records the same data as the Python one, and the same run gets the same diagnosis from either: the tests check this on a real server. See [sdk/typescript](sdk/typescript/README.md).
+
 ### Frameworks
 
 | Framework | One line |
 |---|---|
 | LangChain / LangGraph | `graph.invoke(x, config={"callbacks": [tdn_lc.callback("MyGraph")]})` |
 | OpenAI Agents SDK | `tdn_oa.instrument()` |
+| Claude Agent SDK | `async for m in tdn_claude.trace_stream(query(prompt=p, options=o), name="CodingAgent")` |
+| Google ADK | `App(name="support", root_agent=agent, plugins=[tdn_adk.TracedownPlugin()])` |
+| Pydantic AI | `result = await tdn_pai.run(agent, prompt)` |
+| MCP clients | `tdn_mcp.instrument(client)` or `tdn_mcp.instrument_all()` |
 | CrewAI | `tdn_crew.instrument()` |
 | AutoGen AgentChat | `async for m in tdn_ag.trace_stream(team.run_stream(task=t), name="Team")` |
 | Semantic Kernel | `tdn_sk.instrument(kernel)` |
 | LlamaIndex | `tdn_li.instrument()` |
 | OpenAI / Anthropic clients | `tdn.plugins.instrument("openai", client)` |
+| Vercel AI SDK (TypeScript) | `generateText({ model: traceModel(model), tools: traceTools(tools), ... })` |
+| OpenAI Agents SDK (TypeScript) | `await instrument()` from `agent-tracedown/openai-agents` |
 
-Import them from `agent_tracedown.integrations` (`langchain`, `openai_agents`, `crewai`, `autogen`, `semantic_kernel`, `llamaindex`). Each adapter is tested against the real library: LangGraph 1.2, openai-agents 0.24, CrewAI 1.15, AutoGen 0.7, Semantic Kernel 1.46 and LlamaIndex 0.14. The adapters observe the framework. Replay substitutes outputs only for calls that go through `tdn.llm_call` / `tdn.tool_call` or an instrumented model client.
+Python adapters live in `agent_tracedown.integrations` (`langchain`, `openai_agents`, `claude_agent`, `google_adk`, `pydantic_ai`, `mcp`, `crewai`, `autogen`, `semantic_kernel`, `llamaindex`). Each one is tested against the real library: LangGraph 1.2, openai-agents 0.24, claude-agent-sdk 0.2, google-adk 2.13, pydantic-ai 2.64, mcp 2.3, CrewAI 1.15, AutoGen 0.7, Semantic Kernel 1.46 and LlamaIndex 0.14. The TypeScript ones are tested against Vercel AI SDK 5, 6 and 7 and @openai/agents 0.21. Adapters observe the framework. Replay substitutes outputs only for calls that go through `tdn.llm_call` / `tdn.tool_call`, an instrumented model client, or (in TypeScript) a model wrapped with `traceModel`.
 
 ### Import from Langfuse and OpenTelemetry
 
@@ -222,7 +249,7 @@ Everything in this repository is Apache-2.0: the SDK, the server, the root-cause
 | `TDN_CLICKHOUSE` | ClickHouse URL, or JSON router config for multi-cluster |
 | `TDN_KAFKA_BOOTSTRAP` | Ingest through Kafka/Redpanda; run `tracedown-worker`. The topic is created if missing (`TDN_KAFKA_PARTITIONS`, default 12) |
 | `TDN_OTLP_FORWARD`, `TDN_OTLP_HEADERS` | Forward finished runs to an OTLP endpoint |
-| `TDN_PRICES` | Model prices, USD per million tokens: `{"model": {"input": .., "output": ..}}` |
+| `TDN_PRICES` | Extra or corrected model prices, USD per million tokens, as JSON or a path to a JSON file: `{"model": {"input": .., "output": ..}}`. Current Anthropic, OpenAI and Google models are priced out of the box ([sources](server/tracedown_server/pricing.py)) |
 | `TDN_DRIFT_MIN_RUNS` | Runs per cohort before a drift report (default 20) |
 | `TDN_PUBLIC_URL` | Used in notification links and the cookie `secure` flag |
 
@@ -231,7 +258,8 @@ Everything in this repository is Apache-2.0: the SDK, the server, the root-cause
 
 ```
 spec/                 TDN telemetry spec (JSON Schema)
-sdk/python/           SDK: tracer, exporters, plugins, framework integrations, redaction
+sdk/python/           Python SDK: tracer, exporters, plugins, framework integrations, redaction
+sdk/typescript/       TypeScript SDK: same data and replay; Vercel AI SDK and OpenAI Agents integrations
 server/tracedown_server/    API, pipeline, rca/, claims/, drift/, incidents/, importers/, storage/ (SQLite, Postgres), cache (Redis), enterprise/
 web/                  Next.js web app (React, Tailwind, React Flow, Recharts)
 benchmark/            TDN-RCA-Bench: synthetic generator, data, scorer
@@ -255,6 +283,7 @@ pip install -e ./sdk/python -e "./server[dev]"
 pytest                                     # core
 python benchmark/score.py --split holdout  # synthetic RCA benchmark
 python realworld/whowhen/score.py          # Who&When (after realworld/whowhen/convert.py)
+cd sdk/typescript && npm install && npm test # TypeScript SDK, incl. end-to-end against the server
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Apache-2.0.

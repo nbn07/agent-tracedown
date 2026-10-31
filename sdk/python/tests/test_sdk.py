@@ -166,3 +166,27 @@ def test_declare_tools_keeps_side_effects_flag():
     root = next(s for s in mem.spans if s["parent_span_id"] is None)
     tools = {x["name"]: x for x in root["attributes"]["tdn.tools.available"]}
     assert tools["web_browse"]["side_effects"] is False and "side_effects" not in tools["book_flight"]
+
+
+def test_exact_replay_of_a_failed_tool_raises_the_recorded_error(mem):
+    calls = []
+
+    def flaky(**kw):
+        calls.append(kw)
+        raise ConnectionError("calendar API timed out")
+
+    def agent():
+        with tdn.run("Bot") as run:
+            try:
+                tdn.tool_call("book", {"x": 1}, flaky)
+            except Exception as exc:  # the agent handles the error and tells the user
+                run.output(f"sorry: {exc}")
+            return run.trace_id
+
+    tid = agent()
+    bundle = {"spans": mem.trace(tid), "blobs": dict(mem.blobs)}
+    with tdn.replay(bundle, mode="exact"):
+        nid = agent()
+    assert len(calls) == 1, "the tool did not run again"
+    root = lambda t: next(s for s in mem.trace(t) if s["parent_span_id"] is None)
+    assert root(nid)["output_digest"] == root(tid)["output_digest"]

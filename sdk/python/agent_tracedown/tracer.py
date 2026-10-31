@@ -175,6 +175,8 @@ def _span_ctx(name: str, kind: str, **attrs: Any) -> Iterator[Optional[Span]]:
     except BaseException as exc:
         if span.status_code != "ERROR":
             span.error(f"{type(exc).__name__}: {exc}")
+            # The bare message, so a replay can raise exactly what the agent saw the first time.
+            span.set("tdn.error.message", str(exc)).set("tdn.error.type", type(exc).__name__)
         raise
     finally:
         span.end()
@@ -315,6 +317,9 @@ def _replayable(span: Optional[Span], kind: str, input_value: Any) -> Optional[A
         return None
     rp.served.append(step)
     span.set("tdn.replay.source", "recorded")
+    # A step that failed has no output; the caller replays its recorded error.
+    if rec.get("output_digest") is None and rec.get("status", {}).get("code") == "ERROR":
+        return (None,)
     return (_get_blob(rp.blobs, rec.get("output_digest")),)
 
 
@@ -406,8 +411,10 @@ def tool_call(name: str, args: Dict[str, Any], fn: Callable[..., Any],
             err = _record_tool_error(rec)
             if err:
                 span.error(err)
+                message = rec.get("attributes", {}).get("tdn.error.message", err)
+                span.set("tdn.error.message", message)
                 if raise_on_error:
-                    raise ToolError(err)
+                    raise ToolError(message)
                 return None
             span.output_digest = _put_blob(state, served[0])
             return served[0]

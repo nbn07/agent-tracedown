@@ -1,0 +1,76 @@
+{
+  "name": "agent-tracedown",
+  "version": "0.3.0",
+  "description": "The flight recorder for AI agents: find the step that caused a failure, then replay the run with a fix. TypeScript SDK.",
+  "license": "Apache-2.0",
+  "author": "Naveen Nair",
+  "homepage": "https://github.com/nbn07/agent-tracedown",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nbn07/agent-tracedown.git",
+    "directory": "sdk/typescript"
+  },
+  "bugs": "https://github.com/nbn07/agent-tracedown/issues",
+  "keywords": [
+    "ai-agents",
+    "llm",
+    "observability",
+    "debugging",
+    "root-cause-analysis",
+    "opentelemetry",
+    "tracing"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./ai-sdk": {
+      "types": "./dist/integrations/ai-sdk.d.ts",
+      "default": "./dist/integrations/ai-sdk.js"
+    },
+    "./openai-agents": {
+      "types": "./dist/integrations/openai-agents.d.ts",
+      "default": "./dist/integrations/openai-agents.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.17"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "test": "node --import tsx --test test/*.test.ts"
+  },
+  "peerDependencies": {
+    "@openai/agents": ">=0.1",
+    "ai": ">=5"
+  },
+  "peerDependenciesMeta": {
+    "ai": {
+      "optional": true
+    },
+    "@openai/agents": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@openai/agents": "^0.21.0",
+    "@types/node": "^22.20.5",
+    "ai": "^7.0.159",
+    "ai-v5": "npm:ai@^5.0.283",
+    "ai-v6": "npm:ai@^6.0.320",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "zod": "^4.6.7"
+  }
+}

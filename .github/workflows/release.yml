@@ -1,7 +1,8 @@
 name: release
 
-# Publishes agent-tracedown (SDK) and agent-tracedown-server to PyPI when a version tag
-# such as v0.3.0 is pushed. Uses PyPI trusted publishing: no API token is stored here.
+# Publishes agent-tracedown (SDK) and agent-tracedown-server to PyPI, and the TypeScript
+# SDK agent-tracedown to npm, when a version tag such as v0.3.0 is pushed. PyPI uses
+# trusted publishing (no token stored); npm uses the NPM_TOKEN secret if it is set.
 # One-time setup is in RELEASING.md.
 on:
   push:
@@ -19,6 +20,8 @@ jobs:
           tag="${GITHUB_REF_NAME#v}"
           grep -q "^version = \"$tag\"" sdk/python/pyproject.toml
           grep -q "^version = \"$tag\"" server/pyproject.toml
+          grep -q "\"version\": \"$tag\"" sdk/typescript/package.json
+          grep -q "SDK_VERSION = \"$tag\"" sdk/typescript/src/version.ts
       - run: pip install build twine
       - run: python -m build sdk/python --outdir dist && python -m build server --outdir dist
       - run: twine check dist/*
@@ -35,3 +38,22 @@ jobs:
       - uses: actions/download-artifact@v4
         with: { name: dist, path: dist/ }
       - uses: pypa/gh-action-pypi-publish@release/v1
+
+  npm:
+    runs-on: ubuntu-latest
+    needs: build
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write   # npm provenance: the package page links back to this build
+    defaults:
+      run:
+        working-directory: sdk/typescript
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", registry-url: "https://registry.npmjs.org" }
+      - run: npm ci && npm run build && npm test
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

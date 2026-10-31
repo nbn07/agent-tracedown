@@ -21,7 +21,7 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Red
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from .. import __version__, analytics, drift, incidents
+from .. import __version__, analytics, drift, incidents, pricing
 from ..cache import RateLimiter, cache_from_env, wrap_store
 from ..claims import investigate
 from ..enterprise import queue_from_env
@@ -254,7 +254,9 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
                   limit: int = Query(50, le=500), offset: int = 0, p: Principal = Depends(principal)) -> Dict[str, Any]:
         need(p, "runs:read", project)
         runs = [r for r in store.list_runs(project, agent, outcome, limit, offset) if visible(p, r["project"])]
+        prices = analytics.get_prices(store)
         for r in runs:
+            r.update(pricing.run_cost_from_profile(r.get("profile"), prices, r.get("started_at")))
             f = store.get_findings(r["trace_id"])
             r["root_cause"] = f["root_cause"] if f else None
             r["fault"] = f.get("fault") if f else None
@@ -268,6 +270,12 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
     def get_run(trace_id: str, p: Principal = Depends(principal)) -> Dict[str, Any]:
         spans = spans_for(p, trace_id)
         run = store.get_run(trace_id)
+        prices = analytics.get_prices(store)
+        for s in spans:
+            if s["kind"] == "llm":
+                s["cost_usd"], s["cost_source"] = pricing.span_cost(s, prices)
+        if run is not None:
+            run = {**run, **pricing.run_cost_from_spans(spans, prices)}
         return {"run": run, "spans": spans, "tree": build_tree(spans), "findings": store.get_findings(trace_id)}
 
     @api.get("/runs/{trace_id}/bundle", tags=["replay"])
@@ -408,8 +416,14 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
         need(p, "metrics:read")
         return analytics.get_prices(store)
 
+    @api.get("/settings/prices/overrides", tags=["analytics"])
+    def get_price_overrides(p: Principal = Depends(principal)) -> Dict[str, Any]:
+        """Only the prices saved through the API (not the built-in table or TDN_PRICES)."""
+        need(p, "metrics:read")
+        return analytics.user_prices(store)
+
     @api.put("/settings/prices", tags=["analytics"])
-    def put_prices(prices: Dict[str, Dict[str, float]], p: Principal = Depends(principal)) -> Dict[str, Any]:
+    def put_prices(prices: Dict[str, Dict[str, Any]], p: Principal = Depends(principal)) -> Dict[str, Any]:
         need(p, "policies:manage")
         try:
             return analytics.set_prices(store, prices)

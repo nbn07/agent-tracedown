@@ -196,6 +196,39 @@ def spans_from_otlp(bodies: Iterable[Dict[str, Any]]) -> Dict[str, List[Tuple[Di
     return by_trace
 
 
+_COST_KEYS = ("tdn.llm.cost_usd", "gen_ai.usage.cost", "llm.cost.total", "gen_ai.usage.cost_usd")
+_CACHE_READ_KEYS = ("gen_ai.usage.cache_read.input_tokens", "gen_ai.usage.cache_read_input_tokens",
+                    "llm.token_count.prompt_details.cache_read")
+_CACHE_WRITE_KEYS = ("gen_ai.usage.cache_creation.input_tokens", "gen_ai.usage.cache_creation_input_tokens",
+                     "llm.token_count.prompt_details.cache_write")
+
+
+def _cost_attrs(a: Dict[str, Any]) -> Dict[str, Any]:
+    """Reported cost (OTel GenAI, OpenInference, Langfuse OTel) and cache token counts."""
+    out: Dict[str, Any] = {}
+
+    def num(v):
+        try:
+            return float(v)
+        except (TypeError, ValueError):
+            return None
+
+    cost = next((num(a[k]) for k in _COST_KEYS if num(a.get(k)) is not None), None)
+    if cost is None and a.get("langfuse.observation.cost_details"):
+        cd = maybe_json(a["langfuse.observation.cost_details"])
+        if isinstance(cd, dict):
+            cost = num(cd.get("total")) if num(cd.get("total")) is not None else \
+                (sum(v for v in (num(x) for x in cd.values()) if v is not None) or None)
+    if cost is not None and cost >= 0:
+        out["tdn.llm.cost_usd"] = cost
+    for keys, dest in ((_CACHE_READ_KEYS, "gen_ai.usage.cache_read.input_tokens"),
+                       (_CACHE_WRITE_KEYS, "gen_ai.usage.cache_creation.input_tokens")):
+        v = next((num(a[k]) for k in keys if num(a.get(k)) is not None), None)
+        if v is not None:
+            out[dest] = int(v)
+    return out
+
+
 def node_from_span(s: Dict[str, Any]) -> Node:
     a = attrs_of(s.get("attributes"))
     events = [(e.get("name", ""), attrs_of(e.get("attributes"))) for e in s.get("events", []) or []]
@@ -210,6 +243,7 @@ def node_from_span(s: Dict[str, Any]) -> Node:
     tout = a.get("gen_ai.usage.output_tokens", a.get("gen_ai.usage.completion_tokens", a.get("llm.token_count.completion")))
     keep = {k: maybe_json(v) for k, v in a.items() if k.startswith(("tdn.", "gen_ai.agent", "gen_ai.system", "gen_ai.provider"))
             and k not in ("tdn.kind", "tdn.step", "tdn.input.digest", "tdn.output.digest")}
+    keep.update(_cost_attrs(a))
     return Node(
         id=norm_id(s.get("spanId"), 8), parent=norm_id(s.get("parentSpanId"), 8) or None, name=name, kind=kind,
         start=int(s.get("startTimeUnixNano") or 0), end=int(s.get("endTimeUnixNano") or 0) or None,

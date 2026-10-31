@@ -34,6 +34,11 @@ export interface RunSummary {
   root_cause: RootCause | null;
   hallucination_score: number | null;
   fault?: Fault | null;
+  /** USD; null when no model call in the run has a known price */
+  cost_usd?: number | null;
+  /** false when some model calls had no known price (cost_usd then covers the priced ones) */
+  cost_complete?: boolean;
+  unpriced_calls?: number;
 }
 
 export interface Span {
@@ -48,6 +53,9 @@ export interface Span {
   attributes: Record<string, unknown>;
   input_digest: string | null;
   output_digest: string | null;
+  /** model calls only: USD, and whether the caller reported it or it was computed from tokens */
+  cost_usd?: number | null;
+  cost_source?: "reported" | "computed" | null;
 }
 
 export interface Fault {
@@ -122,8 +130,9 @@ export interface Analytics {
   window_days: number; project: string | null; agent: string | null; overall: AgentStats; agents: Record<string, AgentStats>;
   tools: { tool: string; calls: number; errors: number; error_rate: number; latency_ms: { p50: number; p95: number } }[];
   retrieval: { source: string; queries: number; empty_rate: number; low_score_rate: number; stale_rate: number; avg_max_score: number | null; reached_answer_rate: number | null }[];
-  daily: { day: string; runs: number; failures: number; cost_usd: number }[];
-  prices_configured: boolean;
+  daily: { day: string; runs: number; failures: number; cost_usd: number; cost_by_agent?: Record<string, number> }[];
+  models?: { model: string; calls: number; input_tokens: number; output_tokens: number; cost_usd: number | null; unpriced_calls: number }[];
+  prices_configured: string[];
 }
 
 export interface DiffRow { step: number; change: string; a: { name: string; kind: string; status: string; output: string | null } | null; b: { name: string; kind: string; status: string; output: string | null } | null }

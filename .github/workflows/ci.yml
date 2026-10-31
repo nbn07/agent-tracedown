@@ -18,12 +18,38 @@ jobs:
           python benchmark/score.py --split holdout --json bench.json
           python -c "import json,sys; r=json.load(open('bench.json'))['agent-tracedown']; sys.exit(0 if r['exact@1'] >= 0.95 else 1)"
 
+  typescript:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ["20", "22", "24"]
+    defaults:
+      run:
+        working-directory: sdk/typescript
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "${{ matrix.node }}" }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      # the end-to-end tests compare TypeScript and Python runs on a real server
+      - run: pip install -e ../python -e ../../server
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+      - name: Vercel AI SDK v6 and v5
+        run: |
+          TDN_AI_PKG=ai-v6 node --import tsx --test test/ai-sdk.test.ts
+          TDN_AI_PKG=ai-v5 node --import tsx --test test/ai-sdk.test.ts
+
   frameworks:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        extra: [langgraph, openai-agents, crewai, autogen, semantic-kernel, llamaindex]
+        extra: [langgraph, openai-agents, crewai, autogen, semantic-kernel, llamaindex, claude-agent-sdk, google-adk, pydantic-ai, mcp]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

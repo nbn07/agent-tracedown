@@ -7,6 +7,10 @@ that framework shows up with its agents, LLM calls, tools, retrievals and handof
 |-------------------|----------------------------------------------------------------------|
 | LangChain/LangGraph | ``graph.invoke(x, config={"callbacks": [langchain.callback()]})``  |
 | OpenAI Agents SDK | ``openai_agents.instrument()`` (adds a tracing processor)            |
+| Claude Agent SDK  | ``async for m in claude_agent.trace_stream(query(...), name=...)``   |
+| Google ADK        | ``App(..., plugins=[google_adk.TracedownPlugin()])``                 |
+| Pydantic AI       | ``await pydantic_ai.run(agent, prompt)`` (or ``run_sync``)           |
+| MCP clients       | ``mcp.instrument(client)`` or ``mcp.instrument_all()``               |
 | CrewAI            | ``crewai.instrument()`` (registers an event listener)                |
 | AutoGen AgentChat | ``async for m in autogen.trace_stream(team.run_stream(task=t), ...)``|
 | Semantic Kernel   | ``semantic_kernel.instrument(kernel)`` inside ``tdn.run(...)``       |

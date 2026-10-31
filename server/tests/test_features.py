@@ -216,6 +216,41 @@ def test_resolved_incident_regresses(env):
     assert inc["status"] == "open" and "regressed" in [e["kind"] for e in inc["timeline"]["events"]]
 
 
+def test_two_workers_meeting_a_new_failure_open_one_incident(mem):
+    """Two workers analyse runs with the same new cause at the same moment: both miss the
+    incident on their first look, both insert, and only one may open it."""
+    from tracedown_server import incidents
+    from tracedown_server.storage import SQLiteStore
+    store = SQLiteStore(":memory:")
+    store.ensure_schema(incidents.SCHEMA)
+    reports = []
+    for _ in range(2):
+        tid, spans = run_agent(mem, demo.calendar_agent)
+        reports.append((analyze(spans, mem.blobs), spans))
+    first = incidents.record(store, "demo", *reports[0])
+
+    class Late:  # the second worker looked before the first one's insert landed
+        def __init__(self, inner):
+            self.inner, self.missed = inner, False
+
+        def query(self, sql, args=()):
+            if sql.startswith("SELECT * FROM incidents WHERE project") and not self.missed:
+                self.missed = True
+                return []
+            return self.inner.query(sql, args)
+
+        def __getattr__(self, name):
+            return getattr(self.inner, name)
+
+    second = incidents.record(Late(store), "demo", *reports[1])
+    assert first["events"] == ["incident.opened"] and second["events"] == []
+    assert first["incident"]["id"] == second["incident"]["id"]
+    rows = store.query("SELECT id, run_count FROM incidents")
+    assert len(rows) == 1 and rows[0]["run_count"] == 2
+    opened = store.query("SELECT COUNT(*) n FROM incident_events WHERE kind='opened'")[0]["n"]
+    assert opened == 1
+
+
 def test_different_causes_make_different_incidents_and_successes_make_none(env):
     client, mem, _, _ = env
     for fn in (demo.calendar_agent, demo.refund_agent, demo.research_loop_agent, demo.pricing_agent):
@@ -253,13 +288,25 @@ def test_analytics_overview_cost_tools_retrieval(env):
     with tdn.run("Bot", input="x") as run:
         tdn.llm_call(lambda p, **_: {"text": "y"}, prompt="x", model="m", cost_usd=0.5)
         run.output("y")
+    with tdn.run("HomeGrown", input="x") as run:  # a model with no known price
+        tdn.llm_call(lambda p, **_: {"text": "y", "usage": {"input_tokens": 10, "output_tokens": 5}},
+                     prompt="x", model="my-finetune-7b")
+        run.output("y")
     push(client, mem)
     a = client.get("/api/v1/analytics?days=1").json()
     cal = a["agents"]["CalendarAssistant"]
     assert cal["runs"] == 1 and cal["failure_rate"] == 1.0
     assert cal["cost_usd"]["total"] == pytest.approx((182 * 1 + 19 * 2) / 1e6)
     assert a["agents"]["Bot"]["cost_usd"]["total"] == 0.5
-    assert a["agents"]["SupportBot"]["cost_usd"]["total"] is None  # claude model has no price configured
+    # claude-haiku-4-5 is in the built-in price table ($1 in / $5 out per million tokens)
+    sb = client.get("/api/v1/runs?agent=SupportBot").json()["runs"][0]
+    assert a["agents"]["SupportBot"]["cost_usd"]["total"] == pytest.approx(
+        (sb["input_tokens"] * 1 + sb["output_tokens"] * 5) / 1e6)
+    assert a["agents"]["HomeGrown"]["cost_usd"]["total"] is None
+    assert a["agents"]["HomeGrown"]["cost_usd"]["runs_without_price"] == 1
+    models = {m["model"]: m for m in a["models"]}
+    assert models["my-finetune-7b"]["cost_usd"] is None and models["m"]["cost_usd"] == 0.5
+    assert sum(d["cost_by_agent"].get("Bot", 0) for d in a["daily"]) == 0.5
     assert a["agents"]["SalesAssistant"]["hallucination_rate"] == 1.0
     tool = next(t for t in a["tools"] if t["tool"] == "calendar_create_event")
     assert tool["calls"] == 1 and tool["error_rate"] == 1.0 and tool["latency_ms"]["p50"] is not None

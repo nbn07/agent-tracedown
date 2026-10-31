@@ -18,6 +18,12 @@ export function usd(v: number | null | undefined): string {
   return `$${v.toFixed(2)}`;
 }
 
+/** A run's cost: "$0.012", "$0.012+" when some model calls had no price, "—" when none did. */
+export function runCost(r: { cost_usd?: number | null; cost_complete?: boolean }): string {
+  if (r.cost_usd == null) return "—";
+  return usd(r.cost_usd) + (r.cost_complete === false ? "+" : "");
+}
+
 export function num(v: number | null | undefined): string {
   return v == null ? "—" : v.toLocaleString("en-US", { maximumFractionDigits: 1 });
 }

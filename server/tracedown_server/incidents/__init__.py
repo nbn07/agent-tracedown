@@ -165,24 +165,31 @@ def record(store, project: str, report: Dict[str, Any], spans: List[Dict[str, An
     if sig is None:
         return None
     at = at_ns or time.time_ns()
-    existing = store.query("SELECT * FROM incidents WHERE project IS ? AND signature=?", (project, sig["signature"]))
+    find = ("SELECT * FROM incidents WHERE project IS ? AND signature=?", (project, sig["signature"]))
+    existing = store.query(*find)
     events: List[str] = []
+    opened = False
     if not existing:
-        iid = store.execute(
+        # Several workers can meet the same new failure at once: whoever inserts first opens
+        # the incident, the others attach their run to it.
+        new_id = store.execute(
             "INSERT INTO incidents(project, signature, agent, category, target, title, root_cause, suggested_fix, "
-            "status, severity, run_count, first_seen, last_seen) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "status, severity, run_count, first_seen, last_seen) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) "
+            "ON CONFLICT DO NOTHING",
             (project, sig["signature"], sig["agent"], sig["category"], sig["target"],
              f"{sig['agent']}: {sig['label']}" + (f" in {sig['target']}" if sig["target"] else ""),
              sig["title"], suggest_fix(sig["category"], sig["target"], report["root_cause"]),
              "open", _severity(sig["category"], 1, 1), 0, at, at))
+        existing = store.query(*find)
+        opened = new_id is not None and new_id == existing[0]["id"]
+    iid = existing[0]["id"]
+    if opened:
         _event(store, iid, "opened", {"trace_id": report["trace_id"]})
         events.append("incident.opened")
-    else:
-        iid = existing[0]["id"]
-        if existing[0]["status"] == "resolved":
-            store.execute("UPDATE incidents SET status='open', resolved_at=NULL WHERE id=?", (iid,))
-            _event(store, iid, "regressed", {"trace_id": report["trace_id"]})
-            events.append("incident.regressed")
+    elif existing[0]["status"] == "resolved":
+        store.execute("UPDATE incidents SET status='open', resolved_at=NULL WHERE id=?", (iid,))
+        _event(store, iid, "regressed", {"trace_id": report["trace_id"]})
+        events.append("incident.regressed")
     store.execute("INSERT INTO incident_runs(incident_id, trace_id, at) VALUES (?,?,?) ON CONFLICT DO NOTHING",
                              (iid, report["trace_id"], at))
     count = store.query("SELECT COUNT(*) n FROM incident_runs WHERE incident_id=?", (iid,))[0]["n"]

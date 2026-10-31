@@ -51,6 +51,26 @@ def _usage(o: Dict[str, Any]) -> Tuple[Optional[int], Optional[int]]:
     return as_int(tin), as_int(tout)
 
 
+def _cost_attrs(o: Dict[str, Any]) -> Dict[str, Any]:
+    """The cost Langfuse calculated (exact for that call) and cache token counts, as Tracedown attributes."""
+    out: Dict[str, Any] = {}
+    cd = o.get("costDetails") if isinstance(o.get("costDetails"), dict) else {}
+    cost = o.get("calculatedTotalCost", o.get("totalCost", cd.get("total")))
+    if cost is None and cd:
+        parts = [v for v in cd.values() if isinstance(v, (int, float))]
+        cost = sum(parts) if parts else None
+    if isinstance(cost, (int, float)) and not isinstance(cost, bool) and cost >= 0:
+        out["tdn.llm.cost_usd"] = float(cost)
+    u = o.get("usageDetails") if isinstance(o.get("usageDetails"), dict) else {}
+    cr = u.get("cache_read_input_tokens", u.get("input_cache_read", u.get("input_cached_tokens")))
+    cw = u.get("cache_creation_input_tokens", u.get("input_cache_creation"))
+    if isinstance(cr, (int, float)):
+        out["gen_ai.usage.cache_read.input_tokens"] = int(cr)
+    if isinstance(cw, (int, float)):
+        out["gen_ai.usage.cache_creation.input_tokens"] = int(cw)
+    return out
+
+
 def node_from_observation(o: Dict[str, Any]) -> Node:
     t = str(o.get("type") or "SPAN").upper()
     kind = _KIND.get(t)
@@ -62,6 +82,7 @@ def node_from_observation(o: Dict[str, Any]) -> Node:
     attrs = {"langfuse.observation.id": o.get("id"), "langfuse.observation.type": t}
     if level == "WARNING" and o.get("statusMessage"):
         attrs["langfuse.warning"] = o["statusMessage"]
+    attrs.update(_cost_attrs(o))
     if isinstance(meta.get("side_effects"), bool):
         attrs["tdn.tool.side_effects"] = meta["side_effects"]
     start = _ns(o.get("startTime")) or 0

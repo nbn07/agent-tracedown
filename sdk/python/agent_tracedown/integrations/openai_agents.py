@@ -94,6 +94,10 @@ class TracedownProcessor(_Base):  # type: ignore[misc,valid-type]
             d, kind_name = span.span_data, type(span.span_data).__name__
             parent = span.parent_id
             if kind_name == "AgentSpanData":
+                # runs started without a workflow name are named after their first agent
+                if t.root.attributes.get("gen_ai.agent.name") == "Agent workflow" and d.name:
+                    t.root.name = f"invoke_agent {d.name}"
+                    t.root.set("gen_ai.agent.name", d.name)
                 t.start(span.span_id, f"invoke_agent {d.name}", "agent", parent=parent,
                         attrs={"gen_ai.agent.name": d.name, "tdn.agent.tools": list(d.tools or []),
                                "tdn.agent.handoffs": list(d.handoffs or [])})

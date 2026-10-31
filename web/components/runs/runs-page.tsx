@@ -4,7 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { RotateCcw } from "lucide-react";
 import { useApi } from "@/lib/api";
 import type { RunSummary } from "@/lib/types";
-import { ago, ms, num, pct, short } from "@/lib/format";
+import { ago, ms, num, pct, runCost, short } from "@/lib/format";
 import { PageHeader } from "@/components/page-header";
 import { Select } from "@/components/ui/select";
 import { Badge, outcomeTone } from "@/components/ui/badge";
@@ -69,6 +69,7 @@ export function RunsPage() {
                 <th className="px-3 py-2 font-medium text-right">Unsupported claims</th>
                 <th className="px-3 py-2 font-medium text-right">Steps</th>
                 <th className="px-3 py-2 font-medium text-right">Tokens</th>
+                <th className="px-3 py-2 font-medium text-right">Cost</th>
                 <th className="px-3 py-2 font-medium text-right">Duration</th>
                 <th className="px-3 py-2 font-medium text-right">Started</th>
               </tr>
@@ -93,6 +94,7 @@ export function RunsPage() {
                   <td className="px-3 py-2 text-right tabular">{r.hallucination_score == null ? "—" : pct(r.hallucination_score)}</td>
                   <td className="px-3 py-2 text-right tabular">{r.span_count}</td>
                   <td className="px-3 py-2 text-right tabular">{num((r.input_tokens || 0) + (r.output_tokens || 0))}</td>
+                  <td className="px-3 py-2 text-right tabular" title={r.cost_complete === false ? `${r.unpriced_calls} model call(s) have no known price and are not included` : undefined}>{runCost(r)}</td>
                   <td className="px-3 py-2 text-right tabular">{ms(r.duration_ms)}</td>
                   <td className="px-3 py-2 text-right text-muted whitespace-nowrap">{ago(r.started_at)}</td>
                 </tr>
