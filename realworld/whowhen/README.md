@@ -72,3 +72,18 @@ First run, before both fixes:
 - **The LLM judge was not run here,** because no API key was available.
 
 3. **Claim splitter bug (found 2026-10-30 while building the Langfuse/OTel importer, not on this data).** The hallucination investigator split sentences at every period, so "$4.2 billion" or "example.com" became two bogus claims that no source supported. Hand-Crafted logs are full of URLs and decimals, so false "unsupported claim" findings outranked the real suspects. After the fix, Hand-Crafted went from 34.5% agent / 10.3% step to 51.7% / 19.0%; Algorithm-Generated is unchanged. The fix is generic (a sentence ends only at a period followed by whitespace) and no rule was tuned on Who&When.
+
+## With the LLM judge (Claude Haiku 5.5), 2026-10-30
+
+One run, no tuning on Who&When. The judge is asked only when the best rule finding scores below 0.8: 66 of 126 Algorithm-Generated logs and 5 of 58 Hand-Crafted logs. Its answers are in `judge-answers-haiku-5-5.jsonl`; `python realworld/whowhen/score.py --judge anthropic:claude-haiku-5-5` rescores from them without new calls.
+
+| | Alg. agent | Alg. step | Hand agent | Hand step |
+|---|---|---|---|---|
+| **Tracedown + judge, without ground truth** | **57.9%** | **36.5%** | 53.4% | **20.7%** |
+| Tracedown + judge, with ground truth | 62.7% | 40.5% | 55.2% | 24.1% |
+| Tracedown, rules only | 50.8% | 21.4% | 51.7% | 19.0% |
+| Baseline: first failure-looking output | 50.0% | 23.0% | 58.6% | 15.5% |
+| Paper's GPT-4o methods, without ground truth (best in each column) | 51.1% | 16.6% | 53.4% | 8.8% |
+
+- **Joint agent-and-step accuracy** (the metric AgentDebugX reports, about 29% with a 9B model) is 36.5% on Algorithm-Generated and 20.7% on Hand-Crafted without ground truth. The settings differ, so this is indicative only.
+- **Hand-Crafted barely changes** because the rules rarely hand over to the judge there. Lowering that threshold would be a change to test on other data first.

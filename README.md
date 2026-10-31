@@ -62,7 +62,7 @@ Not every failed run is an agent bug. Every failed run gets a verdict: `agent`, 
   fault:      the user, not the agent (0.80): the user's details matched no account: 3 lookups failed and none succeeded
 ```
 
-The rules are deliberately cautious: right in 2 of 2 cases on a small check, but they catch only a minority of user-caused failures. With `TDN_JUDGE` set, an LLM judge decides the harder cases, such as the user choosing the wrong item themselves. That judge is not yet measured.
+The rules are deliberately cautious: right in 2 of 2 cases on a small check, but they catch only a minority of user-caused failures. With `TDN_JUDGE` set, an LLM judge decides the harder cases, such as the user choosing the wrong item themselves. On a small check against another AI's labels, the judge found half of the user-caused failures but was wrong 4 times in 10 when it blamed the user, so treat its verdict as a lead to check, not a ruling.
 
 ## Already recording with Langfuse, Phoenix or OpenTelemetry?
 
@@ -158,6 +158,15 @@ On the bundled benchmark, [TDN-RCA-Bench v0](benchmark/README.md): 10 failure fa
 | "first error span" baseline | 10% | — |
 
 These are synthetic runs from the same ten scenario structures the engine was built around. They show robustness to wording and noise, not to unseen failure shapes.
+
+**On a public benchmark labelled by people:** [Who&When](realworld/whowhen/README.md) (ICML 2025) has 184 failed multi-agent runs, each with the agent and step that caused the failure. Scoring is exact match, with no ground truth given to the judge.
+
+| | Right step: algorithm-generated logs | Right step: hand-crafted logs |
+|---|---|---|
+| **Tracedown + LLM judge (Claude Haiku 5.5)** | **36.5%** | **20.7%** |
+| Tracedown, rules only (no model) | 21.4% | 19.0% |
+| Simple rule: first failure-looking output | 23.0% | 15.5% |
+| Paper's GPT-4o methods (best in each column) | 16.6% | 8.8% |
 
 **On real failures** ([realworld/](realworld/README.md)): 499 failed τ-bench runs by Claude 3.5 Sonnet, held out while tuning on GPT-4o, with a labelling protocol fixed before scoring.
 

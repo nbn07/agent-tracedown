@@ -1,6 +1,7 @@
 """Score the "who is at fault" verdict against a checked label set.
 
     python realworld/label-check/score_fault.py realworld/label-check/copilot-labels-50.csv
+    python realworld/label-check/score_fault.py --judge=anthropic:claude-haiku-5-5 --show
 
 Truth, fixed before scoring (2026-10-30):
 - verdict Wrong, kind "Customer caused it"                   -> user
@@ -32,7 +33,33 @@ def truth(r):
     return "agent"
 
 
+def make_judge(spec):
+    """Fault-only judge with an answer cache (the root-cause prompt is skipped here)."""
+    from tracedown_server.rca.judge import from_spec
+    fn = from_spec(spec)
+    path = os.path.join(HERE, "..", "data", "fault-judge-cache-" + spec.replace(":", "_") + ".jsonl")
+    cache = {}
+    if os.path.exists(path):
+        for line in open(path):
+            d = json.loads(line)
+            cache[d["key"]] = d["answer"]
+
+    def for_case(case_id):
+        def call(prompt):
+            if "who caused the failure" not in prompt:
+                return "{}"
+            if case_id not in cache:
+                cache[case_id] = fn(prompt)
+                with open(path, "a") as f:
+                    f.write(json.dumps({"key": case_id, "answer": cache[case_id]}) + "\n")
+            return cache[case_id]
+        return call
+    return for_case
+
+
 def main(path):
+    judge_spec = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--judge=")), None)
+    judges = make_judge(judge_spec) if judge_spec else None
     rows = list(csv.DictReader(open(path)))
     cases = {}
     for line in open(os.path.join(HERE, "..", "data", "test.jsonl")):
@@ -44,7 +71,7 @@ def main(path):
         if t is None:
             continue
         b = cases[r["case_id"]]["bundle"]
-        f = analyze(b["spans"], b["blobs"], judge=None)["fault"]
+        f = analyze(b["spans"], b["blobs"], judge=judges(r["case_id"]) if judges else None)["fault"]
         pred = {"agent": "agent", "user": "user", "unfinished": "nobody", "unclear": "agent"}[f["verdict"]]
         pairs.append((r["case_id"], t, pred, f["reason"][:110]))
     n = len(pairs)

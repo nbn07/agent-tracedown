@@ -183,3 +183,13 @@ That gives 34 agent, 12 user and 2 nobody.
 - **Score it yourself:** `python realworld/label-check/score_fault.py --show`.
 
 Along the way, a question in the agent's last turn ("Which date would you like?") was counted as an unsupported claim. A question without a figure is no longer a claim. This changed none of the benchmark numbers above.
+
+### LLM fault verdict (Claude Haiku 5.5), one run on the same 48 runs
+
+| | Accuracy | "user" found | "user" right when said |
+|---|---|---|---|
+| Rules + LLM judge | 77% | 6 of 12 | 6 of 10 |
+| Rules only | 75% | 2 of 12 | 2 of 2 |
+| Always "agent" | 71% | 0 | n/a |
+
+The judge finds three times as many user-caused failures but is wrong 4 times in 10 when it says "user". Copilot's labels are themselves one AI's opinion, so some of these disagreements may be Copilot's mistakes. The answers are in `label-check/fault-judge-answers-haiku-5-5.jsonl`.

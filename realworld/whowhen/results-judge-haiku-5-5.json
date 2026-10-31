@@ -1,0 +1,214 @@
+{
+  "Algorithm-Generated \u00b7 with ground truth": {
+    "n": 126,
+    "ours": {
+      "Tracedown (rules only)": {
+        "agent": 50.79365079365079,
+        "step": 21.428571428571427,
+        "step@3": 33.333333333333336
+      },
+      "baseline: first failure-looking output": {
+        "agent": 50.0,
+        "step": 23.015873015873016,
+        "step@3": 23.015873015873016
+      },
+      "baseline: last step": {
+        "agent": 44.44444444444444,
+        "step": 0.7936507936507936,
+        "step@3": 0.7936507936507936
+      },
+      "baseline: first agent turn": {
+        "agent": 49.20634920634921,
+        "step": 15.873015873015873,
+        "step@3": 15.873015873015873
+      },
+      "Tracedown + judge (anthropic:claude-haiku-5-5)": {
+        "agent": 62.698412698412696,
+        "step": 40.476190476190474,
+        "step@3": 54.76190476190476
+      },
+      "baseline: random (expected)": {
+        "agent": 39.41798941798941,
+        "step": 11.996094734189974,
+        "step@3": 35.988284202569915
+      }
+    },
+    "paper_gpt4o": {
+      "random": [
+        29.1,
+        19.06
+      ],
+      "all-at-once": [
+        54.33,
+        12.5
+      ],
+      "step-by-step": [
+        35.2,
+        25.51
+      ],
+      "binary search": [
+        44.13,
+        23.98
+      ]
+    }
+  },
+  "Algorithm-Generated \u00b7 without ground truth": {
+    "n": 126,
+    "ours": {
+      "Tracedown (rules only)": {
+        "agent": 50.79365079365079,
+        "step": 21.428571428571427,
+        "step@3": 33.333333333333336
+      },
+      "baseline: first failure-looking output": {
+        "agent": 50.0,
+        "step": 23.015873015873016,
+        "step@3": 23.015873015873016
+      },
+      "baseline: last step": {
+        "agent": 44.44444444444444,
+        "step": 0.7936507936507936,
+        "step@3": 0.7936507936507936
+      },
+      "baseline: first agent turn": {
+        "agent": 49.20634920634921,
+        "step": 15.873015873015873,
+        "step@3": 15.873015873015873
+      },
+      "Tracedown + judge (anthropic:claude-haiku-5-5)": {
+        "agent": 57.93650793650794,
+        "step": 36.507936507936506,
+        "step@3": 50.79365079365079
+      },
+      "baseline: random (expected)": {
+        "agent": 39.41798941798941,
+        "step": 11.996094734189974,
+        "step@3": 35.988284202569915
+      }
+    },
+    "paper_gpt4o": {
+      "random": [
+        29.1,
+        19.06
+      ],
+      "all-at-once": [
+        51.12,
+        13.53
+      ],
+      "step-by-step": [
+        26.02,
+        15.31
+      ],
+      "binary search": [
+        30.11,
+        16.59
+      ]
+    }
+  },
+  "Hand-Crafted \u00b7 with ground truth": {
+    "n": 58,
+    "ours": {
+      "Tracedown (rules only)": {
+        "agent": 51.724137931034484,
+        "step": 18.96551724137931,
+        "step@3": 31.03448275862069
+      },
+      "baseline: first failure-looking output": {
+        "agent": 58.62068965517241,
+        "step": 15.517241379310345,
+        "step@3": 15.517241379310345
+      },
+      "baseline: last step": {
+        "agent": 60.3448275862069,
+        "step": 12.068965517241379,
+        "step@3": 12.068965517241379
+      },
+      "baseline: first agent turn": {
+        "agent": 31.03448275862069,
+        "step": 1.7241379310344827,
+        "step@3": 1.7241379310344827
+      },
+      "Tracedown + judge (anthropic:claude-haiku-5-5)": {
+        "agent": 55.172413793103445,
+        "step": 24.137931034482758,
+        "step@3": 36.206896551724135
+      },
+      "baseline: random (expected)": {
+        "agent": 42.52873563218391,
+        "step": 4.156002068761313,
+        "step@3": 12.468006206283938
+      }
+    },
+    "paper_gpt4o": {
+      "random": [
+        12.0,
+        4.16
+      ],
+      "all-at-once": [
+        55.17,
+        5.26
+      ],
+      "step-by-step": [
+        34.48,
+        7.02
+      ],
+      "binary search": [
+        51.72,
+        6.9
+      ]
+    }
+  },
+  "Hand-Crafted \u00b7 without ground truth": {
+    "n": 58,
+    "ours": {
+      "Tracedown (rules only)": {
+        "agent": 51.724137931034484,
+        "step": 18.96551724137931,
+        "step@3": 31.03448275862069
+      },
+      "baseline: first failure-looking output": {
+        "agent": 58.62068965517241,
+        "step": 15.517241379310345,
+        "step@3": 15.517241379310345
+      },
+      "baseline: last step": {
+        "agent": 60.3448275862069,
+        "step": 12.068965517241379,
+        "step@3": 12.068965517241379
+      },
+      "baseline: first agent turn": {
+        "agent": 31.03448275862069,
+        "step": 1.7241379310344827,
+        "step@3": 1.7241379310344827
+      },
+      "Tracedown + judge (anthropic:claude-haiku-5-5)": {
+        "agent": 53.44827586206897,
+        "step": 20.689655172413794,
+        "step@3": 32.758620689655174
+      },
+      "baseline: random (expected)": {
+        "agent": 42.52873563218391,
+        "step": 4.156002068761313,
+        "step@3": 12.468006206283938
+      }
+    },
+    "paper_gpt4o": {
+      "random": [
+        12.0,
+        4.16
+      ],
+      "all-at-once": [
+        53.44,
+        3.51
+      ],
+      "step-by-step": [
+        32.75,
+        8.77
+      ],
+      "binary search": [
+        36.21,
+        6.9
+      ]
+    }
+  }
+}

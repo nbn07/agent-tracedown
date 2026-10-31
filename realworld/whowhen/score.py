@@ -33,11 +33,53 @@ PAPER = {
 Pred = List[Tuple[str, int]]  # ranked (agent, step)
 
 
+import threading
+
+JUDGE = {"fn": None, "cache": {}, "path": None, "key": "", "lock": threading.Lock()}
+
+
+def _judge_for(case):
+    """A judge callable that answers from the cache, asking the model only once per log."""
+    if JUDGE["fn"] is None:
+        return None
+    key = f"{JUDGE['key']}:{case.get('id') or case.get('case_id') or id(case)}"
+
+    def call(prompt: str) -> str:
+        if "who caused the failure" in prompt:  # fault verdict: not scored here
+            return "{}"
+        if key not in JUDGE["cache"]:
+            for attempt in range(5):
+                try:
+                    ans = JUDGE["fn"](prompt)
+                    break
+                except Exception as e:  # noqa: BLE001 - rate limits: wait and retry
+                    if "429" not in str(e) and "529" not in str(e) and "overloaded" not in str(e).lower():
+                        raise
+                    import time
+                    time.sleep(5 * (attempt + 1))
+            else:
+                ans = JUDGE["fn"](prompt)
+            with JUDGE["lock"]:
+                JUDGE["cache"][key] = ans
+                with open(JUDGE["path"], "a") as f:
+                    f.write(json.dumps({"key": key, "answer": ans}) + "\n")
+        return JUDGE["cache"][key]
+    return call
+
+
 def tracedown(case) -> Pred:
+    return _tracedown(case, None)
+
+
+def tracedown_judged(case) -> Pred:
+    return _tracedown(case, _judge_for(case))
+
+
+def _tracedown(case, judge) -> Pred:
     from tracedown_server.rca import analyze
     b = case["bundle"]
     by_id = {s["span_id"]: s for s in b["spans"]}
-    rep = analyze(b["spans"], b["blobs"], judge=None)
+    rep = analyze(b["spans"], b["blobs"], judge=judge)
     out: Pred = []
     for f in rep["findings"]:
         s = by_id.get(f["span_id"])
@@ -120,12 +162,32 @@ def random_expected(cases) -> Dict[str, float]:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--json")
+    ap.add_argument("--judge", help="add the LLM judge, e.g. anthropic:claude-haiku-5-5 (answers are cached)")
+    ap.add_argument("--workers", type=int, default=8)
     a = ap.parse_args()
+    if a.judge:
+        from tracedown_server.rca.judge import from_spec
+        JUDGE["fn"] = from_spec(a.judge)
+        JUDGE["path"] = os.path.join(ROOT, "realworld", "data", "judge-cache-whowhen-" + a.judge.replace(":", "_") + ".jsonl")
+        shipped = os.path.join(HERE, "judge-answers-" + a.judge.split(":", 1)[-1].replace("claude-", "") + ".jsonl")
+        for path in (shipped, JUDGE["path"]):  # answers saved in the repo, then local ones
+            if os.path.exists(path):
+                for line in open(path):
+                    d = json.loads(line)
+                    JUDGE["cache"][d["key"]] = d["answer"]
+        SYSTEMS[f"Tracedown + judge ({a.judge})"] = tracedown_judged
     results = {}
     for subset, name in (("algorithm", "Algorithm-Generated"), ("hand", "Hand-Crafted")):
         for gt in (True, False):
             path = os.path.join(ROOT, "realworld", "data", f"whowhen-{subset}{'-gt' if gt else ''}.jsonl")
             cases = [json.loads(line) for line in open(path)]
+            if a.judge:  # fill the cache in parallel, then score sequentially
+                from concurrent.futures import ThreadPoolExecutor
+                JUDGE["key"] = f"{subset}-{'gt' if gt else 'nogt'}"
+                for i, c in enumerate(cases):
+                    c.setdefault("case_id", c.get("id", i))
+                with ThreadPoolExecutor(a.workers) as ex:
+                    list(ex.map(lambda c: tracedown_judged(c), cases))
             res = {k: score(cases, fn) for k, fn in SYSTEMS.items()}
             res["baseline: random (expected)"] = random_expected(cases)
             key = f"{name} · {'with' if gt else 'without'} ground truth"
