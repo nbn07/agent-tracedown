@@ -142,5 +142,10 @@ test("the TypeScript drift cohort produces a drift report", { skip: !hasServer &
   for (const v of ["billing@v3", "billing@v4"]) for (let i = 0; i < 40; i++) await supportCohort(v, i);
   await waitAnalyzed("ts-drift", 80);
   const { reports } = await get("/api/v1/drift/reports?agent=SupportBot");
-  assert.ok(reports.length > 0, "a drift report appears for SupportBot");
+  // the report must be about this project's prompt change, not just any SupportBot report
+  const prompt = reports.find((r: any) => r.project === "ts-drift" && r.dimension === "prompt_version");
+  assert.ok(prompt, `a prompt-version drift report for ts-drift (got ${JSON.stringify(reports.map((r: any) => [r.project, r.dimension]))})`);
+  assert.equal(prompt.baseline, "billing@v3");
+  assert.equal(prompt.candidate, "billing@v4");
+  assert.equal(prompt.verdict, "drift");
 });
