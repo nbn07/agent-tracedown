@@ -157,7 +157,7 @@ These are synthetic runs from the same ten scenario structures the engine was bu
 | Tracedown + LLM judge (Claude Haiku 5.5) | 63% | 81% | 45% |
 | "first state-changing call" baseline | 74% | 74% | 29% |
 
-The rules find the right neighbourhood but lose to a simple prior on the first guess. Most real failures are the right action with the wrong item, which rules cannot see. The optional LLM judge (`TDN_JUDGE`) fixes the *why* (1% → 45% correct mistake kind) but not the *where*. `realworld/live/` also has harnesses that run the OpenAI Agents SDK customer-service example, a LangGraph SQL agent and τ-bench live with your own model.
+The rules find the right neighbourhood but lose to a simple prior on the first guess. Most real failures are the right action with the wrong item, which rules cannot see. The optional LLM judge (`TDN_JUDGE`) fixes the *why* (1% → 45% correct mistake kind) but not the *where*. A label check by a second AI (Microsoft Copilot) agreed with τ-bench's mechanical labels on only about half of a 50-run sample, so treat these τ-bench numbers as approximate ([details](realworld/LABELING.md)). `realworld/live/` also has harnesses that run the OpenAI Agents SDK customer-service example, a LangGraph SQL agent and τ-bench live with your own model.
 
 ## Configuration
 

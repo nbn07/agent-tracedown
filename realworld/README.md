@@ -37,7 +37,7 @@ What this says: without a model, Tracedown has the right step in its top three 8
 
 The judge names the right kind of mistake for about half of wrong actions and wrong details, which rules almost never do. It does not find the step better: on its own it puts the right step first in 45% of test runs. The judge's 771 answers (dev and test) are in `realworld/judge-answers-haiku-5-5.jsonl`; copy that file to `realworld/data/judge-cache-anthropic_claude-haiku-5-5.jsonl` to recompute the scores without any API calls.
 
-**Human check.** `python realworld/label_sheet.py --split test --n 50` writes a sheet and readable transcripts to `realworld/labeling/`. Fill in the `human_*` columns, then `--score realworld/labeling/sheet.csv` reports how often the mechanical label is right and how Tracedown does against human labels.
+**Label check.** A 50-run sample was checked with labels suggested by Microsoft Copilot (not reviewed by a person). They agreed with the mechanical reference label in only 52% of decided runs. In about 4 of 10 sampled failures, Copilot found the τ-bench simulated customer, not the agent, at fault. Treat the τ-bench scores above as approximate; details in [LABELING.md](LABELING.md). `label_sheet.py` makes a sheet for a human check, and `label-check/score_check.py` scores any filled-in sheet.
 
 ## 1b. Who&When (public failure-attribution benchmark)
 

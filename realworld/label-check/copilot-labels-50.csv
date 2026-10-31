@@ -1,0 +1,51 @@
+n,case_id,suggested_category,suggested_step,verdict,checked_step,kind,note
+1,test-airline-t27-r2,"Right action, wrong details",13,Right,,,"Agent cancelled IFOYYZ (basic economy, booked days ago, no insurance, change of plans) which policy does not allow, and wrongly refused NQNU5R."
+2,test-retail-t34-r0,"Right action, wrong details",13,Wrong,,Something else,"Partial cancel is not possible, so changing the address as the customer asked was correct; the agent made no real mistake."
+3,test-retail-t27-r0,Wrong action,19,Right,,,"Customer preferred the exchange, but agent did the return first, which blocked the boot exchange on the same order."
+4,test-retail-t108-r1,Wrong action,20,Wrong,11,Something else,"Agent wrongly said a puzzle can't be exchanged for a different puzzle, then returned it instead of exchanging it."
+5,test-airline-t30-r7,"Right action, wrong details",24,Right,,,"Agent cancelled 5BGGWZ, a round trip whose outbound flight was already past, without asking a reason; it was not the reservation to cancel."
+6,test-retail-t49-r7,"Right action, wrong details",15,Wrong,13,Customer caused it,"Customer picked the cheapest earbud overall instead of the cheapest one from the rest of that order, and the agent did what was chosen."
+7,test-retail-t92-r7,Stopped short,none,Wrong,12,Wrong action,"Agent processed the return without the customer saying yes, and only looked at one order, missing the other skateboard."
+8,test-retail-t41-r7,Stopped short,none,Right,,,Agent only fixed the profile address and never corrected the addresses on the two pending orders (after locking one by modifying items).
+9,test-airline-t5-r1,"Right action, wrong details",19,Right,,,"Gold member gets 3 free bags in economy, so no paid bags; agent charged for one extra bag."
+10,test-airline-t31-r3,Stopped short,none,Not sure,,,Agent correctly refused the first flight and asked the cancellation reason for the other; conversation ends before the customer answers.
+11,test-retail-t49-r5,"Right action, wrong details",21,Wrong,18,Something else,"The agent listed the earbuds without prices, so the customer could not tell which was cheapest and picked the wrong one."
+12,test-airline-t37-r4,Wrong action,20,Right,,,"The agent issued a $400 certificate even though the customer refused to change or cancel the trip, so no compensation was allowed."
+13,test-retail-t77-r1,Stopped short,none,Wrong,23,Customer caused it,The agent offered the 100ml exchange but the customer got confused and then said the perfume was from another store.
+14,test-retail-t95-r5,"Right action, wrong details",14,Wrong,11,Something else,"The agent's option list left out the 8GB laptop the customer wanted, and the customer then picked a 32GB one."
+15,test-retail-t9-r2,Wrong action,26,Wrong,,Customer caused it,"The customer never gave a valid email or name and zip, so the agent could not verify them and transferring was reasonable."
+16,test-retail-t8-r6,Wrong action,9,Wrong,,Customer caused it,"The customer could not or would not provide email or zip, so the agent could not verify them and transferring was reasonable."
+17,test-airline-t22-r3,Wrong action,25,Right,,,"The agent transferred to a human instead of completing the flight change, which was allowed after upgrading to economy."
+18,test-retail-t23-r7,Stopped short,none,Right,,,"The customer confirmed the luggage exchange but the agent never submitted it, then said all changes were done."
+19,test-airline-t8-r6,Wrong action,18,Right,,,"A basic economy ticket cannot be changed, and the agent updated it with only the credit card instead of cancelling and rebooking with certificates and gift cards."
+20,test-retail-t79-r5,"Right action, wrong details",18,Right,,,"The agent matched the bottle to the current one instead of the customer's other 1000ml bottle, so it chose the wrong item."
+21,test-retail-t87-r5,Stopped short,none,Right,,,Agent saw pending order #W6832752 (no fulfillment) but wrongly called only two orders pending and never changed its address.
+22,test-retail-t99-r2,"Right action, wrong details",28,Wrong,,Customer caused it,Agent used the Mastercard for the camera exchange exactly as the customer asked; no real agent error.
+23,test-retail-t99-r6,"Right action, wrong details",27,Wrong,,Customer caused it,"Agent used the Mastercard the customer explicitly chose for the camera exchange, and correctly refused to refund the cancelled order to another card."
+24,test-retail-t6-r3,Stopped short,none,Wrong,,Customer caused it,"Customer gave a wrong zip, email and ID so the account could never be verified; agent correctly refused to proceed."
+25,test-retail-t21-r6,Stopped short,none,Right,,,"Agent decided the new shoe number was a phone number and never worked out the item swaps for the pending order, though the customer asked it to figure it out."
+26,test-retail-t43-r7,Bad final answer,19,Wrong,14,Bad final answer,"Agent never gave the tracking number or whether the order was still in transit, which the customer asked for."
+27,test-airline-t23-r2,"Right action, wrong details",14,Wrong,4,Wrong action,"Customer wanted a nonstop flight but agent searched and proposed connecting flights (and business upgrade), only finding the nonstop later."
+28,test-retail-t82-r5,"Right action, wrong details",18,Wrong,16,Something else,"Agent told the customer a credit-card refund was possible without checking that the order was paid by gift card, then refunded to gift card without warning."
+29,test-retail-t5-r4,Stopped short,none,Wrong,,Customer caused it,"Customer gave wrong zip, emails and ID so the account was never found and the customer left."
+30,test-retail-t93-r3,"Right action, wrong details",18,Wrong,,Customer caused it,"Customer told the agent to keep the 32GB RAM instead of asking for 8GB, so the agent picked the item the customer described."
+31,test-airline-t7-r7,"Right action, wrong details",21,Right,,,"Agent picked the ATL-DFW-EWR pair as cheapest, but the reference cheaper EWR itinerary (HAT110+HAT172) was missed."
+32,test-retail-t97-r2,Stopped short,none,Wrong,,Customer caused it,"Agent offered the green speaker exchange, but the customer chose to keep the blue speaker and only change the address, which was done."
+33,test-retail-t1-r5,"Right action, wrong details",15,Right,,,"Agent exchanged the keyboard too, claiming a clicky RGB full-size match, though the reference only exchanges the thermostat."
+34,test-retail-t99-r0,Stopped short,none,Right,,,Agent never ran the exchanges after the customer confirmed; the conversation ended after only the cancellation.
+35,test-retail-t74-r1,"Right action, wrong details",19,Right,,,"Agent used PayPal for the laptop change without asking, while the reference uses the credit card."
+36,test-airline-t46-r3,Bad final answer,52,Not sure,,,"Actions matched the reference; the conversation just ends with no flights found, so the real failure is unclear."
+37,test-airline-t5-r6,"Right action, wrong details",20,Right,,,"Gold member in economy gets 3 free bags, but agent counted only 2 free and charged for one bag."
+38,test-airline-t23-r6,"Right action, wrong details",26,Right,,,"Agent set 1 paid bag by assuming 1 free bag without checking membership, but the reference has 2 paid bags."
+39,test-airline-t33-r5,"Right action, wrong details",33,Wrong,16,Something else,"Agent said it couldn't tell flight durations though schedule times were available, so it never cancelled/upgraded the right reservations."
+40,test-airline-t19-r6,"Right action, wrong details",16,Right,,,"Return flight HAT088 was chosen, but the cheaper HAT033 also arrives before 7am and was skipped."
+41,test-airline-t46-r2,Bad final answer,54,Wrong,,Something else,Agent handled the certificate and searched every airport and date asked; the transcript just ends mid-search with no real mistake.
+42,test-retail-t66-r7,Stopped short,none,Wrong,12,Customer caused it,"Agent offered to cancel the order, but the customer refused and chose to keep it."
+43,test-retail-t101-r1,Wrong action,28,Right,,,"Agent used the delivered-order exchange tool on a pending order and then gave up, instead of modifying the pending order."
+44,test-airline-t0-r2,"Right action, wrong details",18,Right,,,Agent booked with two certificates (only one is allowed) instead of the larger certificate plus the 7447 card.
+45,test-airline-t23-r0,Wrong action,15,Right,,,Agent transferred to a human instead of refusing the insurance claim and making the flight and bag changes within budget.
+46,test-airline-t45-r2,Wrong action,20,Right,,,"Agent changed flights on a basic economy ticket, which is not allowed, when only the certificate was due."
+47,test-retail-t89-r3,Bad final answer,20,Wrong,9,Bad final answer,Agent quoted a cheapest keyboard price and options that did not match the expected answer; the later return was fine.
+48,test-retail-t49-r6,"Right action, wrong details",16,Wrong,14,Customer caused it,"Customer picked the cheapest listed earbud instead of the cheapest one from that order, and the agent did what was confirmed."
+49,test-retail-t94-r4,Stopped short,none,Right,,,"Agent already had the account and a matching laptop order but would not proceed, so the exchange was never made."
+50,test-airline-t28-r0,Stopped short,none,Right,,,"Agent only checked three of the reservations, so two cancellable ones (LU15PA, MSJ4OA) were never cancelled."

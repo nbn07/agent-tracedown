@@ -134,3 +134,28 @@ Effect, reported both ways:
 | Synthetic holdout | 100% | 100% |
 
 The judge's answers were reused from the cache, so its prompts list the old rule candidates. The first-write baseline (74% on test) still beats the rules at top-1.
+
+## Label check by a second AI (Microsoft Copilot), 2026-10-30
+
+The 50-run sample from `label_sheet.py` (test split, seed 7) was checked with labels **suggested by Microsoft Copilot**. They were not reviewed by a person, so this is a second AI's opinion, not human judgement. The labels are in `label-check/copilot-labels-50.csv`; rescore with `python realworld/label-check/score_check.py`.
+
+| Copilot's verdict on the reference label | Runs |
+|---|---|
+| Right | 25 |
+| Wrong | 23 (12 "the simulated customer caused it", 7 "something else", mostly no real agent error) |
+| Not sure | 2 |
+
+The reference label agreed with Copilot in **52%** of decided runs. In about 4 of 10 sampled "agent failures", Copilot found no agent mistake: the τ-bench simulated customer gave wrong details, refused an offer or chose another item. Every τ-bench number in this file is measured against that noisy reference.
+
+On the 31 runs with a Copilot-checked step:
+
+| | Right step |
+|---|---|
+| Reference label | 58% |
+| Tracedown rules, top 1 / top 3 | 48% / 58% |
+| Tracedown + judge, top 1 / top 3 | 45% / 58% |
+| Baseline: first write call | 48% |
+
+The sample is small, so these differences are within noise. Two conclusions:
+- Report τ-bench numbers only with this caveat; Who&When (human labels) is the stronger benchmark.
+- A useful product feature follows: telling "the agent made a mistake" apart from "the user caused it" and "nothing went wrong".
