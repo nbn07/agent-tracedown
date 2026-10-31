@@ -18,20 +18,20 @@ Held-out test split, 499 failed runs (383 with a single cause step), rules only:
 
 | System | loc@1 | loc@3 | Category agrees |
 |---|---|---|---|
-| **Tracedown** | **68%** | **81%** | 1% |
+| **Tracedown** | **74%** | **81%** | 0% |
 | Baseline: first write call | 74% | 74% | 29% |
 | Baseline: last write call | 55% | 55% | 29% |
 | Baseline: last LLM turn | 21% | 21% | 42% |
 | Baseline: first tool error | 13% | 13% | 0% |
 
-What this says: without a model, Tracedown has the right step in its top three 81% of the time, but its first guess is worse than "blame the first state-changing call", and it almost never names the *kind* of mistake. These failures are semantic (the right action with the wrong order or item), which rules cannot see.
+What this says: without a model, Tracedown has the right step in its top three 81% of the time, and its first guess now ties "blame the first state-changing call" (it was 68% before change E9 in [LABELING.md](LABELING.md)). It almost never names the *kind* of mistake. These failures are semantic (the right action with the wrong order or item), which rules cannot see.
 
 **With the LLM judge** (Claude Haiku 5.5, one run on test after tuning on dev; details in [LABELING.md](LABELING.md)):
 
 | System | loc@1 | loc@3 | Category agrees |
 |---|---|---|---|
 | Tracedown + judge | 63% | 81% | **45%** |
-| Tracedown, rules only | 68% | 81% | 1% |
+| Tracedown, rules only | 74% | 81% | 0% |
 | Baseline: first write call | 74% | 74% | 29% |
 | Baseline: last LLM turn | 21% | 21% | 42% (always the same answer) |
 

@@ -76,6 +76,20 @@ Tried and **not** shipped, because the dev data showed no signal:
 
 The synthetic benchmark (TDN-RCA-Bench holdout) stayed at 100% after these changes. E4 initially broke it (a 500 error treated as a refusal) and was fixed by the outage/refusal split.
 
+## Change E9: wording findings never outrank the action (2026-10-31, made on dev, test scored once)
+
+E6 was meant to put text findings below action findings in a run that changed state. It did not: a typical unsupported-claim finding scored 0.8 × 0.7 = 0.56, just above the first-write prior's 0.55. On dev, an unsupported claim ranked first in 20 runs and was right in none; in 13 of them the first write call was right.
+
+The fix keeps the ×0.7 and also caps a rule-based unsupported-claim finding just below the best finding on a tool call, in failed runs that changed state. The LLM judge's own verdicts are not capped.
+
+| Rules only | dev loc@1 | dev loc@3 | test loc@1 | test loc@3 |
+|---|---|---|---|---|
+| Before E9 | 68% | 84% | 68% | 81% |
+| After E9 | 74% | 84% | 74% | 81% |
+| Baseline: first write call | 74% | 74% | 74% | 74% |
+
+The test split was scored once, after the change was fixed on dev. The rules now tie the first-write baseline at top-1; they do not beat it. Unchanged: the judge's test scores (63% / 81%, category 45%), Who&When (all rows), and the synthetic holdout (100%).
+
 ## LLM judge run (Claude Haiku 5.5), 2026-10-30
 
 Changes made on dev before the single test run:

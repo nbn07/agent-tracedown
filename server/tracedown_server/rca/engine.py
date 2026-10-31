@@ -159,15 +159,25 @@ def analyze(spans: List[Dict[str, Any]], blobs: Dict[str, str], judge: Any = _NO
     acted = any(s["kind"] == "tool" and s["status"]["code"] != "ERROR" and has_side_effects(s, declared)
                 for s in run.spans)
 
-    def score(f: Finding) -> float:
+    def base(f: Finding) -> float:
         s = f.confidence * (1.2 if f.id in root_causes else 1.0)
         if f.id in unused:
             s *= 0.6
-        if acted and f.category == "hallucination":
-            s *= 0.7
         if f.symptom and f.caused_by:
             s *= 0.8  # the symptom ranks below what caused it
         return min(s, 0.99)
+
+    # Best finding on a tool call: in a run that changed state, the reply's wording ranks below it.
+    action_best = max((base(f) for f in findings if f.category != "hallucination"
+                       and run.by_id.get(f.span_id, {}).get("kind") == "tool"), default=None)
+
+    def score(f: Finding) -> float:
+        s = base(f)
+        if acted and f.category == "hallucination":
+            s *= 0.7
+            if action_best is not None and f.detector != "llm_judge":  # the judge's own reading stands
+                s = min(s, max(action_best - 0.01, 0.0))
+        return s
 
     ranked = sorted(findings, key=lambda f: (-score(f), f.step))
     judged = _ask_judge(run, ranked, score, judge, len(findings))
