@@ -20,9 +20,14 @@ const items = [
 function Brand() {
   return (
     <Link href="/runs" className="flex items-center gap-2" aria-label="Tracedown home">
-      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden>
-        <rect x="2" y="4" width="20" height="16" rx="3" fill="var(--cause)" />
-        <path d="M5 13h3l2-4 3 7 2-3h4" stroke="#fff" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      {/* the Tracedown mark (docs/brand): a trace drops down two steps to the cause */}
+      <svg width="24" height="24" viewBox="0 0 64 64" aria-hidden>
+        <rect x="4" y="4" width="56" height="56" rx="15" fill="#F26419" />
+        <line x1="32" y1="15" x2="32" y2="34.5" stroke="#fff" strokeWidth="4.5" strokeLinecap="round" />
+        <circle cx="32" cy="15" r="4.2" fill="#fff" />
+        <circle cx="32" cy="25.5" r="4.2" fill="#fff" />
+        <circle cx="32" cy="44" r="9" fill="none" stroke="#fff" strokeWidth="4.5" />
+        <circle cx="32" cy="44" r="3.1" fill="#fff" />
       </svg>
       <span className="font-display text-xl font-semibold tracking-wide">Tracedown</span>
     </Link>
