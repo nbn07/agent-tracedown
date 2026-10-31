@@ -128,6 +128,8 @@ tracedown-import otlp traces.json --failed          # any OpenTelemetry export (
 
 Sample exports to try are in [`examples/imports/`](examples/imports/).
 
+For a full 5-minute walkthrough (sample export, real Langfuse keys, reading the stack trace, optional server and judge) see [Diagnose your Langfuse failures in 5 minutes](docs/tutorials/langfuse.md).
+
 ### C. Instrument your own agent (3 minutes)
 
 <table>
