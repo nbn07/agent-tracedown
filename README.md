@@ -6,12 +6,14 @@
 
 Agents fail quietly. A model writes "Friday" where a date belongs. A retriever returns last year's policy. A loop burns 40 tool calls. A run looks fine but books the wrong flight. The error, if there is one, shows up several steps later. Tracedown records every step and walks back from the symptom to the cause:
 
+- **Sits on top of the tracing you already use.** Point it at the failures you already record in **Langfuse**, **Arize Phoenix** or any **OpenTelemetry** exporter, with no code changes. Or add one line to LangGraph, the OpenAI Agents SDK, CrewAI, AutoGen, Semantic Kernel or LlamaIndex.
+- **Measured, not just claimed.** Its accuracy on a public, human-labelled benchmark is published below, including where a simple rule beats it. Anyone can rerun the scores without an API key.
+- **Works without an LLM.** The diagnosis is rules first: local, instant, free and private. An inexpensive judge model is optional and makes it sharper.
 - **AI stack traces.** Every failed run gets a pasteable report: where it surfaced, what caused it, the evidence, and the step to replay from.
-- **Replay with a fix.** Earlier steps come from the recording, and from the step you choose onward the agent runs live with your change, so you can check a fix without re-running the whole conversation.
 - **"Who is at fault?"** A verdict on every failed run: the agent, the user, or nobody yet, because many "agent failures" turn out to be the user's.
-- **Works with what you have.** One line for LangGraph, the OpenAI Agents SDK, CrewAI, AutoGen, Semantic Kernel and LlamaIndex. You can also import runs you already record in **Langfuse**, **Arize Phoenix** or any **OpenTelemetry** exporter.
+- **Replay with a fix.** Earlier steps come from the recording, and from the step you choose onward the agent runs live with your change.
 
-Self-hosted, Apache-2.0, and every feature is free, including the enterprise ones: single sign-on, roles, audit log, PII policies and scale-out storage. There is no paid edition. The SDK has no dependencies. An LLM is optional: the rules work without one, and an inexpensive judge model makes them sharper.
+Self-hosted, Apache-2.0, and every feature is free, including the enterprise ones: single sign-on, roles, audit log, PII policies and scale-out storage. There is no paid edition. The SDK has no dependencies.
 
 ## Try it in a minute
 
@@ -58,6 +60,22 @@ We measured it on public benchmarks and published every number, including the on
 **[τ-bench](realworld/README.md)**: 499 real customer-service failures. Here a simple rule, "blame the first database change", still beats Tracedown's first guess (74% vs 68%). Tracedown's top three suspects contain the right step 81% of the time. A spot check by a second AI found the benchmark's own labels questionable in about half of a 50-run sample, so we treat these numbers as approximate.
 
 The method, the labelling rules and every change made after the first scoring are in [realworld/LABELING.md](realworld/LABELING.md). The judge's answers are saved in the repo, so anyone can re-check the scores without an API key.
+
+## How Tracedown compares
+
+Automatic diagnosis of agent failures is no longer rare, and several projects below are larger and more polished. Tracedown's aim is narrower: an open, **measured** root-cause layer that works on top of whichever tracing tool you already use. Based on each project's own documentation, October 2026:
+
+| | Open source | Explains why a run failed | Replay from a step with a fix | Published diagnosis accuracy | Works without an LLM |
+|---|---|---|---|---|---|
+| **Tracedown** | Apache-2.0, all features | Yes | Yes | Yes ([Who&When](realworld/whowhen/README.md)) | Yes (LLM judge optional) |
+| [Comet Opik](https://github.com/comet-ml/opik) | Apache-2.0 core | Yes, with a suggested fix | Reruns with the failing inputs | Not published | No |
+| [Laminar](https://laminar.sh) | Yes | Pattern search you describe in plain English | Yes | Not published | Search is LLM-based |
+| [Langfuse](https://langfuse.com) | MIT core | No automatic diagnosis (chat assistant, cloud only) | No | n/a | n/a |
+| [Arize Phoenix](https://github.com/Arize-ai/phoenix) | Elastic License 2.0 | On demand, through an AI assistant | Model calls only | Not published | No |
+| [TraceRoot](https://github.com/traceroot-ai/traceroot) | Apache-2.0 core | Yes, against your source code | No | Not published | No |
+| LangSmith, Arize AX, Galileo | No (commercial) | Yes | Not documented | Not published | No |
+
+Use Tracedown **with** these tools, not instead of them. Keep Langfuse or Phoenix for tracing, prompts and evaluations, and run `tracedown-import` on the failures. If you want a full commercial platform, LangSmith and Arize AX are more complete. Sources: each project's documentation and [Arize's 2026 comparison of agent debugging tools](https://arize.com/resources/best-ai-agent-debugging-tools/). If something here is out of date or wrong, please open an issue and it will be corrected.
 
 ## What a report looks like
 
