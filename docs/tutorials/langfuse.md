@@ -6,14 +6,10 @@ No account is required for the sample. Real Langfuse credentials are only needed
 
 ## 1. Install
 
-From a clone of this repository:
-
 ```bash
-git clone https://github.com/nbn07/agent-tracedown && cd agent-tracedown
-pip install ./sdk/python ./server
+pip install agent-tracedown-server
+git clone https://github.com/nbn07/agent-tracedown && cd agent-tracedown   # for the sample files
 ```
-
-Once the package is on PyPI you can use `pip install agent-tracedown-server` instead.
 
 ## 2. Try the sample export (no account)
 
@@ -74,10 +70,10 @@ Useful flags (see `tracedown-import langfuse --help` for the full list):
 
 ## 4. Optional: send to a Tracedown server
 
-Start a local server (no Docker required):
+Start a local server and the web app (no Docker or Node required):
 
 ```bash
-tracedown-server --db demo.db
+tracedown up --no-demo --db demo.db
 ```
 
 Then re-run the import with `--send`:
@@ -87,13 +83,7 @@ tracedown-import langfuse-file examples/imports/langfuse-trace.json \
   --send http://localhost:7070
 ```
 
-Open the web app (in another terminal):
-
-```bash
-cd web && npm install && npm run dev
-```
-
-Visit http://localhost:3000 to browse the imported runs, stack traces, and evidence.
+Open http://127.0.0.1:7070 to browse the imported run, its stack trace and the evidence.
 
 ## 5. Optional: LLM judge
 

@@ -17,7 +17,7 @@ Your tracing tool shows what your agent did. Tracedown tells you which step brok
 
 **Works with** LangGraph · CrewAI · OpenAI Agents · Claude Agent SDK · Google ADK · Pydantic AI · Vercel AI SDK · MCP · Langfuse · Arize Phoenix · OpenTelemetry
 
-[Quick start](#quick-start) · [How it works](#how-it-works) · [Integrations](#integrations) · [Benchmarks](#benchmarks) · [Comparison](#comparison) · [Docs](docs/)
+[Quick start](#quick-start) · [How it works](#how-it-works) · [Integrations](#integrations) · [Benchmarks](#benchmarks) · [Comparison](#comparison) · [Docs](https://nbn07.github.io/agent-tracedown/)
 
 <img src="docs/demo.gif" alt="A support agent tells a customer they will get $120 back; the real answer is $80. Every step of the run succeeded. Tracedown flags the $120 claim as coming from a stale source, walks back to step 2 (an outdated refund policy), says the agent was at fault, and replays the run from step 2 with the current policy, which gives $80." width="820">
 
@@ -40,14 +40,16 @@ Tracedown is the flight recorder that also reads the recording. It walks back fr
 
 ## Quick start
 
-**See it work.** Eight agents fail in realistic ways, from a stale document to a prompt injection, and Tracedown diagnoses each one. No API key, server or Docker needed.
+**See it work.** One command starts the server and the web app, loads eight agents that fail in realistic ways (from a stale document to a prompt injection), and opens your browser. No API key, Node or Docker needed.
 
 ```bash
 pip install agent-tracedown-server
-git clone https://github.com/nbn07/agent-tracedown && python agent-tracedown/examples/run_demo.py
+tracedown up                                      # http://127.0.0.1:7070
 ```
 
-**Diagnose the runs you already have.** No code changes. A [5-minute tutorial](docs/tutorials/langfuse.md) walks through it.
+Prefer the terminal? `tracedown demo` prints every diagnosis instead.
+
+**Diagnose the runs you already have.** No code changes: paste an export into **Diagnose a trace** in the web app, or import from the command line. A [5-minute tutorial](docs/tutorials/langfuse.md) walks through it.
 
 ```bash
 export LANGFUSE_PUBLIC_KEY=pk-lf-... LANGFUSE_SECRET_KEY=sk-lf-...
@@ -87,13 +89,12 @@ The TypeScript and Python SDKs record the same data, and the same run gets the s
 
 </details>
 
-**Open the web app.** Runs, step graphs, incidents, drift and analytics, from the repository you cloned above:
+**Run it for a team.** `tracedown up` is one process on SQLite. For Postgres, several workers, Docker Compose or Kubernetes, see [Deployment](docs/DEPLOYMENT.md):
 
 ```bash
+git clone https://github.com/nbn07/agent-tracedown
 cd agent-tracedown/deploy && docker compose up -d   # web app on :3000, API on :7070
 ```
-
-Without Docker, run `tracedown-server --db tracedown.db` and then `cd web && npm install && npm run dev`.
 
 ## How it works
 

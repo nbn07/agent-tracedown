@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-tracedown-server"
-version = "0.3.0"
+version = "0.4.0"
 description = "Tracedown server and CLI: root-cause analysis for AI agent runs, importers for Langfuse and OpenTelemetry, replay planning and a web viewer."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
-dependencies = ["agent-tracedown>=0.3.0,<0.4", "fastapi>=0.110", "uvicorn>=0.29", "pydantic>=2"]
+dependencies = ["agent-tracedown>=0.4.0,<0.5", "fastapi>=0.110", "uvicorn>=0.29", "pydantic>=2"]
 authors = [{ name = "Naveen Nair" }]
 keywords = ["ai-agents", "llm", "observability", "debugging", "root-cause-analysis", "opentelemetry", "tracing", "langfuse"]
 classifiers = [
