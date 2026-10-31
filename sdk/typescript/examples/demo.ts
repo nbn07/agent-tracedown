@@ -1,5 +1,5 @@
 /**
- * The demo agents from examples/demo_agents.py, in TypeScript. No API keys: the
+ * The first five demo agents from server/tracedown_server/demo/agents.py, in TypeScript. No API keys: the
  * "models" are deterministic stand-ins, so every run reproduces exactly.
  *
  *     npx tsx examples/demo.ts http://localhost:7070

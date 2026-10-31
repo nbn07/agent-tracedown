@@ -53,11 +53,12 @@ test("TypeScript runs get the same diagnosis as Python runs", { skip: !hasServer
   const ts = summary(await waitAnalyzed("ts", 5));
 
   execFileSync("python3", ["-c", `
-import sys; sys.path[:0] = ["${REPO}/examples", "${REPO}/sdk/python"]
-import agent_tracedown as tdn, demo_agents as d
+import sys; sys.path[:0] = ["${REPO}/sdk/python", "${REPO}/server"]
+import agent_tracedown as tdn
+from tracedown_server.demo import agents as d
 tdn.init(project="py", endpoint="${api}")
-for f in d.ALL.values():
-    try: f()
+for name in ${JSON.stringify(Object.keys(ALL))}:  # the stories both SDKs have
+    try: d.ALL[name]()
     except Exception: pass
 `]);
   const py = summary(await waitAnalyzed("py", 5));
