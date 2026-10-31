@@ -85,10 +85,11 @@ Automatic diagnosis of agent failures is no longer rare, and several of the proj
 | [Laminar](https://laminar.sh) | ✅ | Pattern search you describe in plain English | ✅ | Not published | Search is LLM-based |
 | [Langfuse](https://langfuse.com) | MIT core | No automatic diagnosis (chat assistant, cloud only) | ❌ | n/a | n/a |
 | [Arize Phoenix](https://github.com/Arize-ai/phoenix) | Elastic License 2.0 | On demand, through an AI assistant | Model calls only | Not published | ❌ |
+| [AgentDebugX](https://github.com/AgentDebugX/AgentDebugX) | ✅ MIT | ✅ with a proposed fix | ✅ reruns with the fix, after an approval gate | ✅ Who&When (28.8% agent+step, all 184 runs) | Partly (rule packs; diagnosis uses an LLM) |
 | [TraceRoot](https://github.com/traceroot-ai/traceroot) | Apache-2.0 core | ✅ against your source code | ❌ | Not published | ❌ |
 | LangSmith, Arize AX, Galileo | ❌ commercial | ✅ | Not documented | Not published | ❌ |
 
-**Use Tracedown *with* these tools, not instead of them.** Keep Langfuse or Phoenix for tracing, prompts and evaluations, and run `tracedown-import` on the failures. Sources: each project's documentation and [Arize's 2026 comparison](https://arize.com/resources/best-ai-agent-debugging-tools/). Something out of date? [Open an issue](https://github.com/nbn07/agent-tracedown/issues/new) and it will be corrected.
+**Use Tracedown *with* these tools, not instead of them.** Keep Langfuse or Phoenix for tracing, prompts and evaluations, and run `tracedown-import` on the failures. **AgentDebugX is the closest project**: it also publishes Who&When results. Measured the same way (agent and step both right, all 184 runs), Tracedown with a Claude Haiku 5.5 judge scores 31.5% and AgentDebugX's DeepDebug scores 28.8% with Qwen 3.5 9B. That's the same ballpark, with different models, so neither is a clear winner. Sources: each project's documentation, the [AgentDebugX paper](https://arxiv.org/abs/2607.18754) and [Arize's 2026 comparison](https://arize.com/resources/best-ai-agent-debugging-tools/). Something out of date? [Open an issue](https://github.com/nbn07/agent-tracedown/issues/new) and it will be corrected.
 
 ## 📊 Proof, not promises
 

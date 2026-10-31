@@ -143,14 +143,16 @@ SYSTEMS = {"Tracedown (rules only)": tracedown, "baseline: first failure-looking
 
 
 def score(cases, system) -> Dict[str, float]:
-    a = s1 = s3 = 0
+    a = s1 = s3 = both = 0
     for c in cases:
         p = system(c)
         a += p[0][0] == c["mistake_agent"]
         s1 += p[0][1] == c["mistake_step"]
+        both += p[0][0] == c["mistake_agent"] and p[0][1] == c["mistake_step"]
         s3 += c["mistake_step"] in [x[1] for x in p[:3]]
     n = len(cases)
-    return {"agent": 100 * a / n, "step": 100 * s1 / n, "step@3": 100 * s3 / n}
+    # "agent+step": both right at once, the strict measure some papers report (e.g. AgentDebugX)
+    return {"agent": 100 * a / n, "step": 100 * s1 / n, "step@3": 100 * s3 / n, "agent+step": 100 * both / n}
 
 
 def random_expected(cases) -> Dict[str, float]:

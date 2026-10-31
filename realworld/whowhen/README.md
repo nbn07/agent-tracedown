@@ -45,6 +45,21 @@ The paper's own results (Table 1, GPT-4o judge) are below, as published. The pap
 | Step-by-step, without GT | 26.0% | 15.3% | 32.8% | 8.8% |
 | Binary search, without GT | 30.1% | 16.6% | 36.2% | 6.9% |
 
+### All 184 runs, agent and step both right
+
+Some papers report one "strict" number: the run counts only when the predicted agent **and** step are both right, over all 184 runs. `score.py` now prints it as `agent+step`.
+
+| | Agent + step (strict) | Agent |
+|---|---|---|
+| Tracedown + judge (Claude Haiku 5.5), without ground truth | 31.5% | 56.5% |
+| Tracedown + judge (Claude Haiku 5.5), with ground truth | 34.8% | 60.3% |
+| Tracedown, rules only | 20.7% | 51.1% |
+| Baseline: first failure-looking output | 20.7% | 52.7% |
+| AgentDebugX DeepDebug, Qwen 3.5 9B ([paper](https://arxiv.org/abs/2607.18754), as published) | 28.8% | 56.0% |
+| AgentDebugX best single-pass baseline (as published) | 21.7% | 47.8% |
+
+The judge models differ (a hosted Claude model versus a small local Qwen model), so this is not a like-for-like comparison of the methods.
+
 ## What it says
 
 - **Algorithm-Generated:** the rules alone are in the range of GPT-4o judges at step level (21% vs 13–26%) and agent level (51% vs 26–54%), at no model cost. They do not beat the simple "first failed code output" baseline (23%).
