@@ -10,7 +10,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import * as tdn from "../src/index.js";
-import { ALL } from "../examples/demo.js";
+import { ALL, supportCohort } from "../examples/demo.js";
 
 const REPO = resolve(import.meta.dirname, "../../..");
 let hasServer = true;
@@ -135,4 +135,12 @@ test("AI SDK and OpenAI Agents runs get a root cause on the real server", { skip
   assert.equal(ai.outcome, "failure");
   assert.ok(ai.root_cause, "AI SDK run has a root cause");
   assert.ok([1, 2].includes(ai.root_cause.step), "it points at the model call or the failed tool");
+});
+
+test("the TypeScript drift cohort produces a drift report", { skip: !hasServer && "tracedown-server not installed" }, async () => {
+  tdn.init({ project: "ts-drift", endpoint: api });
+  for (const v of ["billing@v3", "billing@v4"]) for (let i = 0; i < 40; i++) await supportCohort(v, i);
+  await waitAnalyzed("ts-drift", 80);
+  const { reports } = await get("/api/v1/drift/reports?agent=SupportBot");
+  assert.ok(reports.length > 0, "a drift report appears for SupportBot");
 });

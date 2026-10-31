@@ -1,5 +1,5 @@
 /**
- * The four demo agents from examples/demo_agents.py, in TypeScript. No API keys: the
+ * The demo agents from examples/demo_agents.py, in TypeScript. No API keys: the
  * "models" are deterministic stand-ins, so every run reproduces exactly.
  *
  *     npx tsx examples/demo.ts http://localhost:7070
@@ -122,6 +122,40 @@ export async function accountAgent(message = "Please cancel my subscription sub_
   });
 }
 
+// 6. drift: a prompt change. Prompt v4 shortens the system prompt and, as a side effect, the model
+// starts calling the `escalate` tool and failing more.
+function seeded(seed: string) { // small seeded generator (xmur3 hash feeding mulberry32): runs reproduce exactly
+  let h = 1779033703 ^ seed.length;
+  for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 3432918353), h = (h << 13) | (h >>> 19);
+  let a = h >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), a | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export async function supportCohort(promptVersion: string, i: number) {
+  const rnd = seeded(`${promptVersion}-${i}`);
+  const question = ["Why was I charged twice?", "Can I change my billing date?", "Where is my invoice?"][Math.floor(rnd() * 3)];
+  const v4 = promptVersion.endsWith("v4");
+  return tdn.run("SupportBot", { input: question, attributes: { release: "2026.10." + (v4 ? "2" : "1") } }, async run => {
+    await tdn.agent("BillingAgent", async () => {
+      await tdn.llmCall(() => ({ text: "lookup", usage: { input_tokens: v4 ? 160 : 220, output_tokens: 20 } }),
+        { model: "gpt-4o-mini", provider: "openai", prompt: question, promptVersion });
+      await tdn.toolCall("get_invoices", { customer: `c${i}` }, () => ({ invoices: 2 }));
+      if (v4 && rnd() < 0.6) await tdn.toolCall("escalate", { reason: "unsure" }, () => ({ ticket: "T-1" }));
+      const failed = rnd() < (v4 ? 0.35 : 0.08);
+      await tdn.llmCall(() => ({ text: "Here is what happened with your bill.", usage: { input_tokens: 300, output_tokens: 40 } }),
+        { model: "gpt-4o-mini", provider: "openai", prompt: question, promptVersion });
+      run.output("Here is what happened with your bill.");
+      if (failed) run.fail("customer reopened the ticket");
+    });
+    return run.traceId;
+  });
+}
+
 export const ALL = { calendar: calendarAgent, refund: refundAgent, loop: researchLoopAgent, pricing: pricingAgent, account: accountAgent };
 
 if (import.meta.url === `file://${process.argv[1]}`) {
@@ -134,4 +168,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       console.log(name, "failed:", (err as Error).message);
     }
   }
+  console.log("drift demo: 40 SupportBot runs on prompt billing@v3, then 40 on billing@v4 …");
+  for (const v of ["billing@v3", "billing@v4"]) for (let i = 0; i < 40; i++) await supportCohort(v, i);
 }
