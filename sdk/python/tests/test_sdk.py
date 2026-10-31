@@ -1,3 +1,4 @@
+import asyncio
 import json
 
 import pytest
@@ -190,3 +191,47 @@ def test_exact_replay_of_a_failed_tool_raises_the_recorded_error(mem):
     assert len(calls) == 1, "the tool did not run again"
     root = lambda t: next(s for s in mem.trace(t) if s["parent_span_id"] is None)
     assert root(nid)["output_digest"] == root(tid)["output_digest"]
+
+
+
+def test_traced_run_records_sync_call_and_preserves_metadata(mem):
+    @tdn.traced_run("EchoBot", environment="test")
+    def answer(question):
+        """Return the question unchanged."""
+        return question
+
+    assert answer.__name__ == "answer"
+    assert answer.__doc__ == "Return the question unchanged."
+    assert answer("hello") == "hello"
+    root = _root(mem.spans)
+    assert json.loads(mem.blobs[root["input_digest"]]) == "hello"
+    assert json.loads(mem.blobs[root["output_digest"]]) == "hello"
+    assert root["attributes"]["tdn.environment"] == "test"
+
+
+def test_traced_run_marks_sync_exception_failed_and_reraises(mem):
+    @tdn.traced_run("FailingBot")
+    def fail(question):
+        raise ValueError("bad input")
+
+    with pytest.raises(ValueError, match="bad input"):
+        fail("invalid")
+    root = _root(mem.spans)
+    assert root["attributes"]["tdn.run.outcome"] == "failure"
+    assert root["status"]["code"] == "ERROR"
+    assert json.loads(mem.blobs[root["input_digest"]]) == "invalid"
+
+
+def test_traced_run_records_async_call(mem):
+    @tdn.traced_run("AsyncBot")
+    async def answer(question):
+        """Answer asynchronously."""
+        return question.upper()
+
+    result = asyncio.run(answer("hello"))
+    assert result == "HELLO"
+    assert answer.__name__ == "answer"
+    assert answer.__doc__ == "Answer asynchronously."
+    root = _root(mem.spans)
+    assert json.loads(mem.blobs[root["input_digest"]]) == "hello"
+    assert json.loads(mem.blobs[root["output_digest"]]) == "HELLO"
