@@ -27,9 +27,15 @@ jobs:
           grep -q "^version = \"$tag\"" server/pyproject.toml
           grep -q "\"version\": \"$tag\"" sdk/typescript/package.json
           grep -q "SDK_VERSION = \"$tag\"" sdk/typescript/src/version.ts
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: web/package-lock.json }
+      - name: Build the web app into the server package (served by `tracedown up`)
+        run: cd web && npm ci && node scripts/build-static.mjs
       - run: pip install build twine
       - run: python -m build sdk/python --outdir dist/sdk && python -m build server --outdir dist/server
       - run: twine check dist/sdk/* dist/server/*
+      - name: The server wheel contains the web app
+        run: python -m zipfile -l dist/server/*.whl | grep -q "tracedown_server/web/runs/_/index.html"
       - uses: actions/upload-artifact@v4
         with: { name: dist-sdk, path: dist/sdk/ }
       - uses: actions/upload-artifact@v4

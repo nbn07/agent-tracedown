@@ -1,9 +1,7 @@
 // Regenerate the README screenshots in web/docs-screenshots/ from a running stack with demo data.
 //
-//   tracedown-server --db demo.db                          # API on :7070
-//   python examples/run_demo.py --endpoint http://localhost:7070
-//   cd web && npm run build && npm start                    # web app on :3000
-//   node web/scripts/screenshots.mjs http://localhost:3000 http://localhost:7070
+//   node web/scripts/build-static.mjs && tracedown up --db demo.db --no-open   # app and API on :7070
+//   node web/scripts/screenshots.mjs http://localhost:7070 http://localhost:7070
 //
 // Light theme, 1440 px wide, like the existing images. Needs Playwright with Chromium.
 import { createRequire } from "node:module";
@@ -20,7 +18,7 @@ const pick = (agent, pred = () => true) => runs.find(r => r.agent_name === agent
 const replay = pick("CalendarAssistant", r => r.replay_of);
 const calendar = runs.find(r => r.trace_id === replay?.replay_of);
 const sales = pick("SalesAssistant");
-if (!calendar || !replay || !sales) throw new Error("demo data missing: run examples/run_demo.py against the API first");
+if (!calendar || !replay || !sales) throw new Error("demo data missing: start with `tracedown up` on an empty database");
 
 const shots = [
   ["runs", "/runs"],

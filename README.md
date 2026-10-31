@@ -19,7 +19,7 @@ Tracedown is an open-source AI agent debugger. It finds the root cause of a fail
 
 <img src="docs/demo.gif" alt="A support agent tells a customer they will get $120 back; the real answer is $80. Every step of the run succeeded. Tracedown flags the $120 claim as coming from a stale source, walks back to step 2 (an outdated refund policy), says the agent was at fault, and replays the run from step 2 with the current policy, which gives $80." width="820">
 
-<sub>A real run from <a href="examples/demo_agents.py"><code>examples/demo_agents.py</code></a>. Every verdict shown is Tracedown's actual output. <a href="docs/demo/demo.mp4">Watch in HD</a>.</sub>
+<sub>A real run from <a href="server/tracedown_server/demo/agents.py"><code>tracedown_server/demo/agents.py</code></a>. Every verdict shown is Tracedown's actual output. <a href="docs/demo/demo.mp4">Watch in HD</a>.</sub>
 
 </div>
 
@@ -38,7 +38,7 @@ Tracedown is the flight recorder that also reads the recording. It walks back fr
 
 ## Quick start
 
-**See it work.** Five agents fail in realistic ways and Tracedown diagnoses each one. No API key, server or Docker needed.
+**See it work.** Eight agents fail in realistic ways, from a stale document to a prompt injection, and Tracedown diagnoses each one. No API key, server or Docker needed.
 
 ```bash
 pip install agent-tracedown-server

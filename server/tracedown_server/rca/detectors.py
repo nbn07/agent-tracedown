@@ -29,6 +29,7 @@ CATEGORY_LABELS = {
     "judged": "Diagnosis by LLM judge",
     "incomplete_task": "Task left incomplete",
     "policy_violation": "Policy violation",
+    "prompt_injection": "Prompt injection",
 }
 
 
@@ -170,14 +171,25 @@ def tool_errors(run: RunView) -> List[Finding]:
                                [f"step {run.step(retry)} called {tool}() successfully"
                                 + (" with the same arguments" if same else " with corrected arguments")]))
             continue
+        evidence = [f"step {run.step(s)} status ERROR: {s['status']['message']}",
+                    f"arguments: {json.dumps(run.input(s), default=str)[:200]}"]
+        answer = text_of(run.output(run.root))
+        claim = _SUCCESS_CLAIM.search(answer) if writes and later else None
+        if claim and not successful_writes:
+            # The silent failure: the action failed, the agent carried on and told the user it worked.
+            sentence = next((x for x in re.split(r"(?<=[.!?])\s+", answer) if claim.group(0) in x), answer)
+            evidence.append(f"the final answer still reports success: {sentence[:160]!r}")
         out.append(Finding(
             category="invalid_tool_args" if invalid else "tool_failure",
             title=f"{tool}() {'rejected its arguments' if invalid else 'failed'}: {s['status']['message']}",
             span_id=s["span_id"], step=run.step(s), confidence=0.9, detector="tool_errors", symptom=True,
-            evidence=[f"step {run.step(s)} status ERROR: {s['status']['message']}",
-                      f"arguments: {json.dumps(run.input(s), default=str)[:200]}"],
+            evidence=evidence,
         ))
     return out
+
+
+_SUCCESS_CLAIM = re.compile(r"\b(confirmed|has been (placed|sent|booked|processed|cancelled|refunded)|"
+                            r"successfully|is on its way|will ship|all set|is done)\b", re.I)
 
 
 def _schema_errors(args: Any, schema: Optional[Dict[str, Any]]) -> Optional[List[str]]:
@@ -324,6 +336,61 @@ def retrieval_quality(run: RunView) -> List[Finding]:
                                f"Low-relevance retrieval for {q!r} (best score {a['tdn.retrieval.max_score']:.2f})",
                                s["span_id"], run.step(s), 0.7, "retrieval_quality",
                                [f"max score {a['tdn.retrieval.max_score']:.2f} < 0.50"]))
+    return out
+
+
+# Instructions aimed at the model, hidden in content it reads (a web page, a document, a tool result).
+_INJECTION = re.compile(
+    r"(ignore (all |any |the )?(previous|prior|above|earlier) (instructions|prompts?|rules)|"
+    r"disregard (all |any |the |your )?(previous|prior|above|earlier) (instructions|prompts?|rules)|"
+    r"forget (all |your )?(previous|prior) instructions|new instructions\s*:|"
+    r"system (note|override|instruction)s?\s*:|do not (tell|inform|mention (this )?to) the user|"
+    r"reveal (your|the) (system prompt|instructions)|you are now (in )?(developer|admin|dan)\b)", re.I)
+_TARGET = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+|https?://[^\s\"'<>)]+")
+
+
+@detector
+def prompt_injection(run: RunView) -> List[Finding]:
+    """Content the agent read (retrieved text or a tool result) that tells the model what to do.
+
+    On its own it is a warning. When a later tool call uses an address or link that appears
+    in that content and nowhere in the user's request, the agent most likely followed it.
+    """
+    request = text_of(run.input(run.root))
+    out = []
+    for s in run.spans:
+        if s["kind"] not in ("retrieval", "tool") or s["status"]["code"] == "ERROR":
+            continue
+        value = run.output(s)
+        if isinstance(value, list) and all(isinstance(c, dict) and "text" in c for c in value):
+            text = "\n".join(text_of(c["text"]) for c in value)  # retrieved chunks: their text only
+        else:
+            text = text_of(value)
+        m = _INJECTION.search(text)
+        if not m:
+            continue
+        snippet = text[max(0, m.start() - 20): m.end() + 100].strip()
+        targets = {t.rstrip(".,;") for t in _TARGET.findall(text[m.start(): m.end() + 400])} - {""}
+        targets = {t for t in targets if t not in request}
+        used = []
+        for t in run.of_kind("tool"):
+            if run.step(t) <= run.step(s):
+                continue
+            args = text_of(run.input(t))
+            hit = next((x for x in sorted(targets) if x in args), None)
+            if hit:
+                used.append((t, hit))
+        where = s["attributes"].get("tdn.retrieval.source") or s["attributes"].get("gen_ai.tool.name") or s["name"]
+        evidence = [f"step {run.step(s)} content contains instructions for the model: \"…{snippet[:160]}…\""]
+        if used:
+            t, hit = used[0]
+            tool = t["attributes"].get("gen_ai.tool.name", t["name"])
+            evidence.append(f"step {run.step(t)} {tool}() used {hit!r}, which appears in that content "
+                            f"and not in the user's request")
+        out.append(Finding("prompt_injection",
+                           f"Instructions hidden in content from {where} at step {run.step(s)}"
+                           + (f" were followed at step {run.step(used[0][0])}" if used else ""),
+                           s["span_id"], run.step(s), 0.9 if used else 0.6, "prompt_injection", evidence))
     return out
 
 

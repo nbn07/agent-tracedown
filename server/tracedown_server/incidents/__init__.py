@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS incident_events (
 
 SEVERITY_ORDER = ["low", "medium", "high", "critical"]
 # Categories that hurt users silently (the run "succeeded") start one level higher.
-SILENT = {"hallucination", "stale_source"}
+SILENT = {"hallucination", "stale_source", "prompt_injection"}
 
 
 # ----------------------------------------------------------------------------- signature
@@ -108,6 +108,9 @@ def suggest_fix(category: str, target: Optional[str], finding: Dict[str, Any]) -
     m = re.search(r"which (\w+)\(\)", finding.get("title", ""))
     consumer = f"{m.group(1)}()" if m else "the next step"
     fixes = {
+        "prompt_injection": f"Content from {t} carries instructions for the model, and the agent acted on them. "
+                            f"Pass fetched content to the model as quoted data, not instructions; require "
+                            f"confirmation before tools that send data out; and allow-list recipients.",
         "stale_source": f"Remove or re-index {t}: it is marked superseded but still ranks first. Add a version "
                         f"filter to the retriever so superseded documents are excluded.",
         "retrieval_failure": f"Check the {t} index for the query terms in the evidence; add documents or a "

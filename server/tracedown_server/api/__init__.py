@@ -38,6 +38,32 @@ from ..storage import SQLiteStore, TraceOwnershipError
 from .views import build_graph, build_tree, merge_graphs
 
 STATIC = Path(__file__).resolve().parent.parent / "static"
+# The full web app, exported as static files (web/scripts/build-static.mjs) and shipped in the
+# wheel. TDN_WEB_DIR points elsewhere; an empty value turns it off.
+WEB = Path(os.environ.get("TDN_WEB_DIR", "") or Path(__file__).resolve().parent.parent / "web")
+_API_PREFIXES = ("api/", "v1/", "auth/", "healthz", "metrics", "docs", "redoc", "openapi.json", "static/")
+_DETAIL_ROUTES = ("runs", "incidents")  # one prerendered page each, at <route>/_/
+
+
+def _web_file(path: str) -> Optional[Path]:
+    """Map a browser path to a file in the exported web app, or None."""
+    parts = [p for p in path.split("/") if p not in ("", ".", "..")]
+    if len(parts) >= 2 and parts[0] in _DETAIL_ROUTES:
+        parts[1] = "_"  # /runs/<any id>/... -> /runs/_/...
+    f = WEB.joinpath(*parts) if parts else WEB
+    if f.is_dir():
+        f = f / "index.html"
+    elif not f.exists() and f.with_suffix(".html").exists():
+        f = f.with_suffix(".html")
+    try:
+        f.resolve().relative_to(WEB.resolve())
+    except ValueError:
+        return None
+    return f if f.is_file() else None
+
+
+def web_available() -> bool:
+    return os.environ.get("TDN_WEB_DIR", None) != "" and (WEB / "index.html").is_file()
 
 
 # ----------------------------------------------------------------------------- request models
@@ -660,7 +686,23 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
     app.include_router(api)
     if STATIC.exists():
         app.mount("/static", StaticFiles(directory=STATIC), name="static")
-
+    if web_available():
+        @app.api_route("/{path:path}", methods=["GET", "HEAD"], include_in_schema=False)
+        def web(path: str, request: Request):
+            if path.startswith(_API_PREFIXES):
+                raise HTTPException(404, "not found")
+            if path and not path.endswith("/") and "." not in path.rsplit("/", 1)[-1]:
+                query = ("?" + request.url.query) if request.url.query else ""
+                return RedirectResponse("/" + path + "/" + query, status_code=308)  # the export uses trailing slashes
+            f = _web_file(path)
+            if f is None:
+                missing = WEB / "404.html"
+                return FileResponse(missing, status_code=404) if missing.is_file() else \
+                    PlainTextResponse("not found", status_code=404)
+            # Hashed assets never change; pages must pick up a new build at once.
+            cache = "public, max-age=31536000, immutable" if path.startswith("_next/static/") else "no-cache"
+            return FileResponse(f, headers={"Cache-Control": cache})
+    elif STATIC.exists():
         @app.get("/", include_in_schema=False)
         def index() -> FileResponse:
             return FileResponse(STATIC / "index.html")

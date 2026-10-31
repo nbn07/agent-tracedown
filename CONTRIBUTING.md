@@ -20,7 +20,8 @@ Thanks for helping. The fastest ways to make a difference right now:
 ```bash
 pip install -e ./sdk/python -e "./server[dev]"
 pytest                             # SDK + server tests, about 15 seconds
-tracedown-server --db dev.db       # then: python examples/run_demo.py --endpoint http://localhost:7070
+tracedown up --db dev.db           # server and demo runs on :7070; the full web app after
+                                   #   `node web/scripts/build-static.mjs`
 cd sdk/typescript && npm install && npm test    # TypeScript SDK
 cd web && npm install && npm run dev            # web app on :3000, talking to the server on :7070
 ```
@@ -31,13 +32,14 @@ cd web && npm install && npm run dev            # web app on :3000, talking to t
 spec/                     TDN telemetry spec (JSON Schema)
 sdk/python/               Python SDK: tracer, exporters, plugins, framework integrations, redaction
 sdk/typescript/           TypeScript SDK: same data and replay; Vercel AI SDK and OpenAI Agents integrations
-server/tracedown_server/  API, pipeline, rca/, claims/, drift/, incidents/, importers/, pricing, storage/, enterprise/
+server/tracedown_server/  API, pipeline, rca/, claims/, drift/, incidents/, importers/, pricing, storage/, enterprise/,
+                          demo/ (the demo agents), cli.py (`tracedown up`), web/ (built web app, not committed)
 web/                      Next.js web app (React, Tailwind, React Flow, Recharts)
 benchmark/                TDN-RCA-Bench: synthetic generator, data, scorer
 realworld/                evaluation on real failures: Who&When, τ-bench, live harnesses, label checks
 docs/                     design, deployment, configuration, standards proposal (OTel GenAI SIG)
 deploy/                   Dockerfiles, Compose (standard / scale), Helm chart, full-stack test (e2e/)
-examples/                 demo agents, the end-to-end demo, sample OTel/Langfuse exports (imports/)
+examples/                 run_demo.py, sample OTel/Langfuse exports (imports/)
 ```
 
 ## Reporting a wrong diagnosis

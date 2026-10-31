@@ -40,6 +40,7 @@ kafka = ["confluent-kafka>=2.3"]
 enterprise = ["pyjwt[crypto]>=2.8", "confluent-kafka>=2.3", "psycopg[binary]>=3.1", "psycopg-pool>=3.2", "redis>=5"]
 
 [project.scripts]
+tracedown = "tracedown_server.cli:main"
 tracedown-server = "tracedown_server.__main__:main"
 tracedown-worker = "tracedown_server.enterprise.queue:main"
 tracedown-import = "tracedown_server.importers.cli:main"
@@ -48,4 +49,4 @@ tracedown-import = "tracedown_server.importers.cli:main"
 include = ["tracedown_server*"]
 
 [tool.setuptools.package-data]
-tracedown_server = ["static/*"]
+tracedown_server = ["static/*", "web/**/*"]

@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useRouteId } from "@/lib/route";
 import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -59,7 +60,7 @@ export function IncidentsPage() {
 }
 
 export function IncidentDetail() {
-  const { id } = useParams<{ id: string }>();
+  const id = useRouteId();
   const { data: i, error, loading, reload } = useApi<Incident>(`/incidents/${id}`);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);

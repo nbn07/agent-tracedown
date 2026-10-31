@@ -18,6 +18,36 @@ jobs:
           python benchmark/score.py --split holdout --json bench.json
           python -c "import json,sys; r=json.load(open('bench.json'))['agent-tracedown']; sys.exit(0 if r['exact@1'] >= 0.95 else 1)"
 
+  web:
+    # The web app, built both ways: the standalone server (Docker image) and the static
+    # export that ships inside the Python package for `tracedown up`.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: web/package-lock.json }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: npm ci
+        working-directory: web
+      - run: npm run typecheck && npm run build
+        working-directory: web
+      - run: node web/scripts/build-static.mjs
+      - name: The server serves the bundled app
+        run: |
+          pip install -e ./sdk/python -e "./server[dev]"
+          python - <<'PY'
+          from fastapi.testclient import TestClient
+          from tracedown_server.api import create_app, web_available
+          from tracedown_server.storage import SQLiteStore
+          assert web_available(), "static export missing"
+          c = TestClient(create_app(SQLiteStore(":memory:")))
+          for path in ("/", "/runs/", "/runs/some-id/", "/incidents/1/", "/analytics/"):
+              r = c.get(path)
+              assert r.status_code == 200 and "<html" in r.text, path
+          print("web app served")
+          PY
+
   typescript:
     runs-on: ubuntu-latest
     strategy:

@@ -12,3 +12,5 @@ web/node_modules/
 web/.next/
 web/tsconfig.tsbuildinfo
 docs/demo/.frames/
+server/tracedown_server/web/
+web/out/

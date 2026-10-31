@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useRouteId } from "@/lib/route";
 import { useMemo, useState } from "react";
 import { ArrowLeft, GitCompare, Sparkles } from "lucide-react";
 import { api, useApi } from "@/lib/api";
@@ -22,7 +22,7 @@ import { ClaimsView } from "./claims";
 import { ReplayPlanner } from "./replay";
 
 export function RunDetailPage() {
-  const { id } = useParams<{ id: string }>();
+  const id = useRouteId();
   const { data, error, loading, reload } = useApi<RunDetail>(`/runs/${id}`);
   const [selected, setSelected] = useState<string | null>(null);
   const [tab, setTab] = useState("graph");
