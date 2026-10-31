@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { Activity, AlertTriangle, BarChart3, FileUp, GitCompare, ListTree, Network, Radio, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/cn";
+import { useReadOnly } from "@/lib/read-only";
 import { ThemeToggle } from "./theme";
 import { SettingsButton } from "./settings";
 
@@ -35,6 +36,17 @@ function Brand() {
   );
 }
 
+function DemoNote() {
+  const readOnly = useReadOnly();
+  if (!readOnly) return null;
+  return (
+    <p className="rounded-md border border-line bg-sunken px-2.5 py-2 text-xs leading-5 text-muted">
+      <span className="font-medium text-ink">Read-only demo.</span> Look around freely. To diagnose your own runs:{" "}
+      <code className="font-mono text-[11px]">pip install agent-tracedown-server</code>
+    </p>
+  );
+}
+
 export function Nav() {
   const path = usePathname();
   const [open, setOpen] = useState(false);
@@ -58,6 +70,7 @@ export function Nav() {
       <aside className="hidden md:flex fixed inset-y-0 left-0 w-56 flex-col border-r border-line bg-panel px-3 py-4 gap-6">
         <div className="px-1.5"><Brand /></div>
         {links}
+        <DemoNote />
         <div className="mt-auto flex items-center justify-between px-1">
           <span className="text-[11px] text-muted">v0.3</span>
           <div className="flex"><SettingsButton /><ThemeToggle /></div>

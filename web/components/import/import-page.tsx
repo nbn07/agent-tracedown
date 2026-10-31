@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import { useReadOnly } from "@/lib/read-only";
 import { FileUp } from "lucide-react";
 import { ApiError, authHeaders } from "@/lib/api";
 import { PageHeader } from "@/components/page-header";
@@ -38,10 +39,7 @@ export function ImportPage() {
   const [result, setResult] = useState<Result | null>(null);
   const [dragging, setDragging] = useState(false);
   const file = useRef<HTMLInputElement>(null);
-  const [readOnly, setReadOnly] = useState(false);
-  useEffect(() => {
-    fetch("/healthz").then(r => r.json()).then(h => setReadOnly(Boolean(h.read_only))).catch(() => undefined);
-  }, []);
+  const readOnly = useReadOnly();
 
   const run = async (body: string) => {
     setBusy(true); setError(null); setResult(null);
@@ -81,7 +79,7 @@ export function ImportPage() {
         </div>
       )}
 
-      <div
+      {!readOnly && <div
         onDragOver={e => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={e => { e.preventDefault(); setDragging(false); readFile(e.dataTransfer.files[0]); }}
@@ -103,7 +101,7 @@ export function ImportPage() {
             ))}
           </span>
         </div>
-      </div>
+      </div>}
 
       {error && <p role="alert" className="mt-4 rounded-md border border-bad/40 bg-bad-soft p-3 text-sm text-bad">{error}</p>}
 

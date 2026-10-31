@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRouteId } from "@/lib/route";
+import { useReadOnly } from "@/lib/read-only";
 import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -64,6 +65,7 @@ export function IncidentDetail() {
   const { data: i, error, loading, reload } = useApi<Incident>(`/incidents/${id}`);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const readOnly = useReadOnly();
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (loading && !i) return <Loading rows={8} />;
   if (!i) return null;
@@ -75,7 +77,7 @@ export function IncidentDetail() {
       <PageHeader eyebrow={`Incident #${i.id} · ${i.project}`} title={i.title}
         sub={<span className="flex flex-wrap items-center gap-2"><Badge tone={severityTone(i.severity)}>{i.severity}</Badge><Badge tone={statusTone(i.status)}>{i.status}</Badge>
           <span>{i.run_count} runs · first {when(i.first_seen)} · last {ago(i.last_seen)}</span></span>}
-        action={<div className="flex gap-2">
+        action={readOnly ? <span className="text-xs text-muted">Read-only demo: incidents cannot be changed</span> : <div className="flex gap-2">
           {i.status !== "acknowledged" && i.status !== "resolved" && <Button disabled={busy} onClick={() => setStatus("acknowledged")}>Acknowledge</Button>}
           {i.status !== "resolved" ? <Button variant="primary" disabled={busy} onClick={() => setStatus("resolved")}>Resolve</Button> : <Button disabled={busy} onClick={() => setStatus("open")}>Reopen</Button>}
         </div>} />
