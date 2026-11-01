@@ -51,6 +51,7 @@ nav:
   - FAQ: faq.md
   - Diagnose runs you already have: importing.md
   - Integrations: integrations.md
+  - Ask your coding assistant (MCP): mcp.md
   - How Tracedown decides: HOW-IT-DECIDES.md
   - Benchmarks: benchmarks.md
   - Tutorials:

@@ -3,6 +3,7 @@
     tracedown up              # server + web app on http://127.0.0.1:7070, with demo runs, opens the browser
     tracedown up --no-demo    # the same, starting empty, for your own runs
     tracedown demo            # print the demo diagnoses in the terminal, no server
+    tracedown mcp             # MCP server (stdio) for Claude Code, Cursor and other MCP clients
 
 ``tracedown-server`` stays the command for production (Postgres, Redis, several workers).
 """
@@ -152,9 +153,17 @@ def main(argv=None) -> int:
                    help="refuse every write once the demo runs are loaded (for a public demo)")
     u.set_defaults(func=up)
 
+    m = sub.add_parser("mcp", help="run Tracedown as an MCP server (stdio) for Claude Code, Cursor and other clients",
+                       add_help=False)
+    m.set_defaults(func=None)
+
     d = sub.add_parser("demo", help="print the demo agents' diagnoses in the terminal, no server")
     d.set_defaults(func=demo)
 
+    argv = sys.argv[1:] if argv is None else list(argv)
+    if argv[:1] == ["mcp"]:  # its own options and --help
+        from .mcp_server import main as mcp_main
+        return mcp_main(argv[1:])
     args = p.parse_args(argv)
     return args.func(args)
 

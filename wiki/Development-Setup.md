@@ -51,6 +51,7 @@ cd sdk/typescript && npm install && npm test
 | `tracedown up --no-demo` | Start empty, for your own runs |
 | `tracedown up --read-only` | Refuse all writes after loading the demo (like the public demo) |
 | `tracedown demo` | Print the demo diagnoses in the terminal, no server |
+| `tracedown mcp` | MCP server (stdio) for Claude Code, Cursor and other MCP clients; needs the `[mcp]` extra |
 | `tracedown-import` | Import Langfuse, Phoenix or OTLP exports |
 | `tracedown-server` | Production server (Postgres, Redis, several workers) |
 

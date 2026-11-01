@@ -28,7 +28,7 @@ Still to come: LLM-worded suggestions when a judge is on, and the TypeScript SDK
 
 ## Next
 
-- **MCP server**, to ask "why did run X fail?" from Claude Code, Cursor or any MCP client
+- **MCP server** (`tracedown mcp`, on `main`, in the next release): ask "why did run X fail, and what fix works?" from Claude Code, Cursor or any MCP client
 - **GitHub Action** that runs your agent's test conversations on every pull request
 - **Write-back to Langfuse and Phoenix**, so the verdict appears in the tool you already use
 - **Better accuracy on long multi-agent runs**, measured on Who&When
