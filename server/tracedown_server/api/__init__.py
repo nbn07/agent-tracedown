@@ -365,7 +365,18 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
         from .. import fixes
         spans = spans_for(p, trace_id)
         report = store.get_findings(trace_id) or analysis(trace_id, spans)
-        return {"trace_id": trace_id, "suggestions": fixes.suggest(report, spans, blobs_for(spans))}
+        replays = []
+        for row in store.query("SELECT trace_id FROM runs WHERE replay_of = ? ORDER BY started_at DESC LIMIT 30",
+                               [trace_id]):
+            r_spans = store.get_spans(row["trace_id"])
+            if not r_spans:
+                continue
+            root = next((s for s in r_spans if not s["parent_span_id"]), r_spans[0])
+            r_report = store.get_findings(row["trace_id"]) or analysis(row["trace_id"], r_spans)
+            replays.append({"trace_id": row["trace_id"], "suggestion": root["attributes"].get("tdn.replay.suggestion"),
+                            "check": fixes.check(report, r_report)})
+        return {"trace_id": trace_id,
+                **fixes.with_results(fixes.suggest(report, spans, blobs_for(spans)), replays)}
 
     @api.get("/runs/{trace_id}/graph", tags=["visualization"])
     def get_graph(trace_id: str, p: Principal = Depends(principal)) -> Dict[str, Any]:

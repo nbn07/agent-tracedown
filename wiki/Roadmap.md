@@ -21,7 +21,7 @@ Like a mechanic who swaps the part and takes the car for a test drive.
 - [x] **No real side effects during checks:** tools are blocked unless you give a stand-in or name them as safe
 - [x] **Suggested fixes** for common problems, and `tdn.try_fixes()` to try each one with the same check (prompt instruction for bad values and made-up facts, leaving out outdated or injected documents; loops and failing tools get advice only)
 - [ ] LLM-worded suggestions when a judge is turned on
-- [ ] **In the web app:** "Test this fix" on a failed run, with the result
+- [x] **In the web app:** a Fixes tab on each failed run (suggestions, whether each one worked, and the code to try them), and "Did this replay fix the run?" on every replay
 - [ ] TypeScript SDK support (planned for v0.6)
 
 Work happens on the [`proven-fixes`](https://github.com/nbn07/agent-tracedown/tree/proven-fixes) branch.

@@ -239,3 +239,28 @@ def test_code_changes_and_user_mistakes_are_not_tried(server):
     assert [r["verdict"] for r in loop] == ["not_tried"] and "stop condition" in loop[0]["change"]
     user = tdn.try_fixes(_failed(server, "order_status"), agent=demo.ALL["order_status"])
     assert user[0]["verdict"] == "not_tried" and "not the agent's mistake" in user[0]["change"]
+
+
+# ----------------------------------------------------------------------------- part 3: results in the web app
+
+def test_suggestions_show_whether_each_fix_worked(server):
+    tid = _bad_run(server)
+    [before] = _suggestions(server, tid)
+    assert before["status"] == "untested" and before["replays"] == []
+    tdn.try_fixes(tid, agent=demo.calendar_agent, tools=STUB, tries=2)
+    import urllib.request
+    with urllib.request.urlopen(f"{server}/api/v1/runs/{tid}/suggestions") as r:
+        data = json.loads(r.read())
+    [after] = data["suggestions"]
+    assert after["status"] == "works" and after["result"] == "2 of 2 replays passed"
+    assert all(rep["suggestion"] == "bad_llm_output@4" for rep in after["replays"])
+    assert data["other_replays"] == []
+
+
+def test_a_users_own_replay_is_listed_separately_and_checked():
+    sugg = [{"key": "bad_llm_output@4", "try": {"from_step": 4}}, {"key": "loop@3", "try": None}]
+    replays = [{"trace_id": "a", "suggestion": None, "check": {"passed": True}},
+               {"trace_id": "b", "suggestion": "bad_llm_output@4", "check": {"passed": False}}]
+    out = fixes.with_results(sugg, replays)
+    assert [s["status"] for s in out["suggestions"]] == ["does_not_work", "not_tried"]
+    assert [r["trace_id"] for r in out["other_replays"]] == ["a"]

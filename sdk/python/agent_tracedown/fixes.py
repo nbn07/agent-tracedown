@@ -156,7 +156,8 @@ def try_fixes(trace_id: str, agent: Callable[[], Any], *,
                         "summary": s.get("why_not_tried") or "Tracedown cannot try this one for you."})
             continue
         bundle = bundle or tracer.fetch_bundle(base, trace_id, key)
-        overrides = {**attempt["overrides"], "tools": dict(tools or {}), "live_tools": list(live_tools or [])}
+        overrides = {**attempt["overrides"], "tools": dict(tools or {}), "live_tools": list(live_tools or []),
+                     "suggestion": s["key"]}
         results, blocked = _replay_and_check(base, key, trace_id, bundle, attempt["from_step"], overrides,
                                              agent, test, tries)
         if blocked:

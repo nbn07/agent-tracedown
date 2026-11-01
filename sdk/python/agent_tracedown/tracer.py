@@ -246,6 +246,8 @@ def run(name: str, input: Any = None, **attrs: Any) -> Iterator[RunHandle]:
     if replay:
         root.set("tdn.replay.of", replay.source_trace_id).set("tdn.replay.mode", replay.mode)
         replay.runs.append(state.trace_id)
+        if replay.overrides.get("suggestion"):
+            root.set("tdn.replay.suggestion", replay.overrides["suggestion"])
     if input is not None:
         root.input_digest = _put_blob(state, input)
     state.spans.append(root)

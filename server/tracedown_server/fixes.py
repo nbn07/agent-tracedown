@@ -154,7 +154,7 @@ def _one(view, f: Dict[str, Any], findings: List[Dict[str, Any]]) -> Optional[Di
         change = ("The call failed, but the reply told the user it worked. Check the tool's result before "
                   "writing the reply, and tell the user plainly when an action did not happen. ") + change
     return {
-        "finding": f["id"], "category": cat, "label": f.get("label", cat), "step": step,
+        "key": f"{cat}@{step}", "finding": f["id"], "category": cat, "label": f.get("label", cat), "step": step,
         "title": f["title"], "change": change, "try": attempt, "why_not_tried": why_not,
         "tries_as": _describe(attempt),
     }
@@ -185,7 +185,7 @@ def suggest(report: Dict[str, Any], spans: List[Dict[str, Any]], blobs: Dict[str
     fault = report.get("fault") or {}
     if fault.get("verdict") in ("user", "unfinished"):
         rc = report["root_cause"]
-        return [{"id": "fix-1", "finding": rc.get("id"), "category": rc["category"], "label": rc.get("label"),
+        return [{"id": "fix-1", "key": f"{rc['category']}@{rc['step']}", "finding": rc.get("id"), "category": rc["category"], "label": rc.get("label"),
                  "step": rc["step"], "title": rc["title"], "try": None, "tries_as": None,
                  "change": ("This failure was not the agent's mistake: " + fault.get("reason", "") + ". "
                             "Nothing in the agent needs fixing. If it happens often, help users get it right, "
@@ -210,3 +210,27 @@ def suggest(report: Dict[str, Any], spans: List[Dict[str, Any]], blobs: Dict[str
         if len(out) >= MAX_SUGGESTIONS:
             break
     return out
+
+
+def with_results(suggestions: List[Dict[str, Any]], replays: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Attach replay results to suggestions. ``replays``: [{trace_id, suggestion, check}], newest first.
+
+    A suggestion ``works`` when its latest tries (up to three) all passed; replays that tested
+    no suggestion (your own fixes) are returned separately.
+    """
+    by_key: Dict[str, List[Dict[str, Any]]] = {}
+    own = []
+    for r in replays:
+        (by_key.setdefault(r["suggestion"], []) if r.get("suggestion") else own).append(r)
+    for s in suggestions:
+        tried = by_key.get(s["key"], [])[:3]
+        s["replays"] = tried
+        if not s.get("try"):
+            s["status"] = "not_tried"
+        elif not tried:
+            s["status"] = "untested"
+        else:
+            ok = sum(1 for r in tried if r["check"].get("passed"))
+            s["status"] = "works" if ok == len(tried) else "does_not_work"
+            s["result"] = f"{ok} of {len(tried)} replays passed"
+    return {"suggestions": suggestions, "other_replays": own}

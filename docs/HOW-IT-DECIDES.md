@@ -158,6 +158,8 @@ Tracedown replays the run from that step with your corrected output, three times
 
 `tdn.try_fixes(trace_id, agent=...)` runs each of these with the same check as above, three times, and labels it **works**, **does not work** or **blocked**. Other problems, such as loops or a tool that keeps failing, need a change in your code: they come back as **not tried**, with what to change. When the user, not the agent, was at fault, the suggestion says so and nothing is tried.
 
+In the web app, the **Fixes** tab of a failed run lists the suggestions with their results, and a replay's page says whether it fixed the run.
+
 A fix that works in the replay is a strong hint, not a guarantee: an added instruction can help this run and not the next. Keep the replays as tests.
 
 ## How often it is right
