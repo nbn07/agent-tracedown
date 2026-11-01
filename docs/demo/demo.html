@@ -81,6 +81,7 @@
   #end .tag1 { font: 600 28px Inter, sans-serif; color: var(--orange); margin-top: 8px; }
   #end .tag2 { font: 500 20px Inter, sans-serif; color: var(--muted); margin-top: 26px; max-width: 980px; line-height: 1.5; }
   #end .url { font: 600 24px "DejaVu Sans Mono", monospace; margin-top: 30px; padding: 12px 22px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+  #end .cmd { font: 500 19px "DejaVu Sans Mono", monospace; color: var(--muted); margin-top: 14px; }
   #end .chips { margin-top: 22px; display: flex; gap: 10px; }
   #end .chip { font: 600 15px Inter, sans-serif; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); color: #cdd6e0; }
 </style>
@@ -112,7 +113,7 @@
 </div>
 <div id="rc" class="abs">
   <div id="fault" class="abs">At fault: the agent</div>
-  <div class="l1"><span class="orange">Root cause · step 2 · Outdated retrieval source</span> <span style="color:var(--muted);font-weight:500">(confidence 0.80)</span></div>
+  <div class="l1"><span class="orange">Root cause · step 2 · Outdated retrieval source</span> <span style="color:var(--muted);font-weight:500">(top suspect)</span></div>
   <div class="ev">Retrieved an outdated source: <span class="mono">refund-policy-2023.md (v2023.2)</span><br>
     1 of 2 chunks marked stale · its output flows into the final answer, where the failure surfaced</div>
 </div>
@@ -132,6 +133,7 @@
     <span class="chip">Vercel AI SDK</span><span class="chip">Langfuse</span><span class="chip">OpenTelemetry</span>
   </div>
   <div class="url">github.com/nbn07/agent-tracedown</div>
+  <div class="cmd">pip install agent-tracedown-server &amp;&amp; tracedown up</div>
 </div>
 
 <script>
