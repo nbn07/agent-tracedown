@@ -1,5 +1,7 @@
 # Contributing to Tracedown
 
+Thanks for helping. New here? The [wiki](https://github.com/nbn07/agent-tracedown/wiki) walks you through [your first contribution](https://github.com/nbn07/agent-tracedown/wiki/Your-First-Contribution), [the architecture](https://github.com/nbn07/agent-tracedown/wiki/Architecture-Tour) and [writing a detector](https://github.com/nbn07/agent-tracedown/wiki/Writing-a-Detector).
+
 Thanks for helping. The fastest ways to make a difference right now:
 
 1. **A failing run we diagnose wrongly.** Open an issue with the run bundle (`GET /api/v1/runs/{id}/bundle`, redacted) and what the real root cause was. These become the RCA benchmark.
@@ -41,6 +43,7 @@ server/tracedown_server/  API, pipeline, rca/, claims/, drift/, incidents/, impo
 web/                      Next.js web app (React, Tailwind, React Flow, Recharts)
 benchmark/                TDN-RCA-Bench: synthetic generator, data, scorer
 realworld/                evaluation on real failures: Who&When, τ-bench, live harnesses, label checks
+wiki/                     the GitHub wiki's pages; edit here, a workflow publishes them
 docs/                     design, deployment, configuration, standards proposal (OTel GenAI SIG)
 deploy/                   Dockerfiles, Compose (standard / scale), Helm chart, full-stack test (e2e/), public demo (demo/)
 .devcontainer/            the Codespaces / Dev Containers setup

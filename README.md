@@ -242,12 +242,11 @@ helm install tracedown deploy/helm/tracedown
 
 </details>
 
-**Documentation:** [How it decides](docs/HOW-IT-DECIDES.md) · [Deployment](docs/DEPLOYMENT.md) · [Configuration](docs/CONFIGURATION.md) · [Design](docs/DESIGN.md) · [Langfuse tutorial](docs/tutorials/langfuse.md) · [Python SDK](sdk/python/README.md) · [TypeScript SDK](sdk/typescript/README.md) · [Telemetry spec](spec/)
+**Documentation:** [Wiki](https://github.com/nbn07/agent-tracedown/wiki) · [How it decides](docs/HOW-IT-DECIDES.md) · [Deployment](docs/DEPLOYMENT.md) · [Configuration](docs/CONFIGURATION.md) · [Design](docs/DESIGN.md) · [Langfuse tutorial](docs/tutorials/langfuse.md) · [Python SDK](sdk/python/README.md) · [TypeScript SDK](sdk/typescript/README.md) · [Telemetry spec](spec/)
 
 ## Roadmap
 
-- **Hosted demo**, to try Tracedown without installing anything
-- **Proven fixes:** suggest a fix, replay the run with it, and show that it now passes
+- **Proven fixes** (in progress for v0.5): suggest a fix, replay the run with it, and show that it now passes. Done so far: the check that decides whether a replay fixed the run, and `tdn.confirm_cause()`
 - **MCP server**, to ask "why did run X fail?" from Claude Code, Cursor or any MCP client
 - **GitHub Action** that runs your agent's test conversations on every pull request
 - **Write-back to Langfuse and Phoenix**, so the verdict appears in the tool you already use
@@ -260,7 +259,7 @@ If Tracedown found a bug for you, or you run it at work, say so in [Show and tel
 
 ## Contributing
 
-The most valuable contribution is a run Tracedown diagnoses wrongly: [report a wrong diagnosis](https://github.com/nbn07/agent-tracedown/issues/new?template=wrong-diagnosis.yml) and it becomes a benchmark case that every later version is tested against. Detectors, framework adapters and documentation are welcome too. Start with [CONTRIBUTING.md](CONTRIBUTING.md) or an issue labelled [good first issue](https://github.com/nbn07/agent-tracedown/labels/good%20first%20issue): each one names the files to change and how to test. Questions go to [Discussions](https://github.com/nbn07/agent-tracedown/discussions).
+The most valuable contribution is a run Tracedown diagnoses wrongly: [report a wrong diagnosis](https://github.com/nbn07/agent-tracedown/issues/new?template=wrong-diagnosis.yml) and it becomes a benchmark case that every later version is tested against. Detectors, framework adapters and documentation are welcome too. Start with [CONTRIBUTING.md](CONTRIBUTING.md) or an issue labelled [good first issue](https://github.com/nbn07/agent-tracedown/labels/good%20first%20issue): each one names the files to change and how to test. Questions go to [Discussions](https://github.com/nbn07/agent-tracedown/discussions). The [wiki](https://github.com/nbn07/agent-tracedown/wiki) explains how the code fits together, with step-by-step guides for a first pull request, a new detector or a new framework integration.
 
 Nothing to install: open a ready-made development environment in your browser, with every dependency set up and the tests passing.
 

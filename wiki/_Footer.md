@@ -1,0 +1,1 @@
+Tracedown is Apache-2.0, every feature free · [Repository](https://github.com/nbn07/agent-tracedown) · [Documentation](https://nbn07.github.io/agent-tracedown/) · Something out of date? These pages live in [`wiki/`](https://github.com/nbn07/agent-tracedown/tree/main/wiki): open a pull request or [an issue](https://github.com/nbn07/agent-tracedown/issues/new).

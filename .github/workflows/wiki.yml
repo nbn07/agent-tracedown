@@ -1,0 +1,35 @@
+# Publishes wiki/ to the GitHub wiki (https://github.com/nbn07/agent-tracedown/wiki).
+# Edit the pages in wiki/ through pull requests; edits made in the wiki's web editor are
+# overwritten on the next publish.
+name: wiki
+
+on:
+  push:
+    branches: [main]
+    paths: ["wiki/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency: wiki
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Copy wiki/ to the wiki repository
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AUTHOR_NAME: ${{ github.event.head_commit.author.name || github.actor }}
+          AUTHOR_EMAIL: ${{ github.event.head_commit.author.email || format('{0}@users.noreply.github.com', github.actor) }}
+          MESSAGE: ${{ github.event.head_commit.message || 'Publish wiki' }}
+        run: |
+          git clone --depth 1 "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" "$RUNNER_TEMP/wiki"
+          rsync -a --delete --exclude .git wiki/ "$RUNNER_TEMP/wiki/"
+          cd "$RUNNER_TEMP/wiki"
+          git add -A
+          if git diff --cached --quiet; then echo "The wiki is already up to date."; exit 0; fi
+          git -c user.name="$AUTHOR_NAME" -c user.email="$AUTHOR_EMAIL" commit -q -m "$MESSAGE"
+          git push -q origin HEAD
