@@ -260,11 +260,23 @@ If Tracedown found a bug for you, or you run it at work, say so in [Show and tel
 
 ## Contributing
 
-The most valuable contribution is a run Tracedown diagnoses wrongly: [report a wrong diagnosis](https://github.com/nbn07/agent-tracedown/issues/new?template=wrong-diagnosis.yml) and it becomes a benchmark case that every later version is tested against. Detectors, framework adapters and documentation are welcome too. Start with [CONTRIBUTING.md](CONTRIBUTING.md) or an issue labelled [good first issue](https://github.com/nbn07/agent-tracedown/labels/good%20first%20issue). Questions go to [Discussions](https://github.com/nbn07/agent-tracedown/discussions).
+The most valuable contribution is a run Tracedown diagnoses wrongly: [report a wrong diagnosis](https://github.com/nbn07/agent-tracedown/issues/new?template=wrong-diagnosis.yml) and it becomes a benchmark case that every later version is tested against. Detectors, framework adapters and documentation are welcome too. Start with [CONTRIBUTING.md](CONTRIBUTING.md) or an issue labelled [good first issue](https://github.com/nbn07/agent-tracedown/labels/good%20first%20issue): each one names the files to change and how to test. Questions go to [Discussions](https://github.com/nbn07/agent-tracedown/discussions).
+
+Nothing to install: open a ready-made development environment in your browser, with every dependency set up and the tests passing.
+
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/nbn07/agent-tracedown?quickstart=1)
 
 ```bash
 pip install -e ./sdk/python -e "./server[dev]" && pytest
 ```
+
+### Contributors
+
+Thank you to everyone who has made Tracedown better:
+
+<table><tr><td align="center"><a href="https://github.com/HarshRajSinghania"><img src="https://github.com/HarshRajSinghania.png?size=80" width="64" alt="HarshRajSinghania"><br><sub><b>HarshRajSinghania</b></sub></a><br><sub>Langfuse tutorial</sub></td><td align="center"><a href="https://github.com/AndreIsraelAO"><img src="https://github.com/AndreIsraelAO.png?size=80" width="64" alt="AndreIsraelAO"><br><sub><b>AndreIsraelAO</b></sub></a><br><sub>TypeScript drift demo</sub></td><td align="center"><a href="https://github.com/Vamsi-2581"><img src="https://github.com/Vamsi-2581.png?size=80" width="64" alt="Vamsi-2581"><br><sub><b>Vamsi-2581</b></sub></a><br><sub><code>@tdn.traced_run</code></sub></td><td align="center"><a href="https://github.com/Sonike"><img src="https://github.com/Sonike.png?size=80" width="64" alt="Sonike"><br><sub><b>Sonike</b></sub></a><br><sub>free port for <code>tracedown up</code></sub></td></tr></table>
+
+Your name goes here with your first merged pull request.
 
 ## License
 

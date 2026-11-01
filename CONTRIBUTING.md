@@ -3,7 +3,7 @@
 Thanks for helping. The fastest ways to make a difference right now:
 
 1. **A failing run we diagnose wrongly.** Open an issue with the run bundle (`GET /api/v1/runs/{id}/bundle`, redacted) and what the real root cause was. These become the RCA benchmark.
-2. **A detector.** Add a function decorated with `@detector` in `server/tracedown_server/rca/detectors.py`; it receives a `RunView` and returns `Finding`s. Include a demo agent in `examples/` that triggers it and a test.
+2. **A detector.** Add a function decorated with `@detector` in `server/tracedown_server/rca/detectors.py`; it receives a `RunView` and returns `Finding`s. Include a test, and a demo agent in `server/tracedown_server/demo/agents.py` if it makes a good story.
 3. **A framework adapter.** See `sdk/python/agent_tracedown/integrations/` (Python) or `sdk/typescript/src/integrations/` (TypeScript). Use `ManualTrace` when the framework reports events on other threads, add a test under `sdk/python/tests/integrations/` that drives the real library without network, and add an extra to `sdk/python/pyproject.toml`.
 4. **A benchmark case.** See `benchmark/README.md`; real, redacted failures are the most valuable contribution of all.
 5. **A plugin.** Subclass `Plugin` in `sdk/python/agent_tracedown/plugins/`, route calls through `tdn.llm_call` / `tdn.tool_call` so replay works, and `register()` it. Aim for about 100 lines and no hard dependency on the wrapped library.
@@ -16,6 +16,10 @@ Thanks for helping. The fastest ways to make a difference right now:
 - Every detector reports evidence a human can check; no unexplained scores.
 
 ## Setup
+
+**In the browser, nothing to install:** on the repository page click **Code → Codespaces → Create codespace** (or use the [direct link](https://codespaces.new/nbn07/agent-tracedown?quickstart=1)). In about two minutes you have Python, Node, every dependency and the bundled web app, set up by `.devcontainer/setup.sh`. The same setup works locally with VS Code's "Dev Containers: Reopen in Container". Run `tracedown up --no-open` there and open the forwarded port 7070.
+
+**On your own machine** (Python 3.10+, Node 20+):
 
 ```bash
 pip install -e ./sdk/python -e "./server[dev]"
@@ -38,7 +42,8 @@ web/                      Next.js web app (React, Tailwind, React Flow, Recharts
 benchmark/                TDN-RCA-Bench: synthetic generator, data, scorer
 realworld/                evaluation on real failures: Who&When, τ-bench, live harnesses, label checks
 docs/                     design, deployment, configuration, standards proposal (OTel GenAI SIG)
-deploy/                   Dockerfiles, Compose (standard / scale), Helm chart, full-stack test (e2e/)
+deploy/                   Dockerfiles, Compose (standard / scale), Helm chart, full-stack test (e2e/), public demo (demo/)
+.devcontainer/            the Codespaces / Dev Containers setup
 examples/                 run_demo.py, sample OTel/Langfuse exports (imports/)
 ```
 

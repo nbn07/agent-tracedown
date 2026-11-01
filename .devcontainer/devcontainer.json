@@ -1,0 +1,27 @@
+{
+  // One-click development environment: GitHub → Code → Codespaces → Create codespace.
+  // Also works with VS Code "Dev Containers: Reopen in Container".
+  "name": "Tracedown",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "22" }
+  },
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "forwardPorts": [7070, 3000],
+  "portsAttributes": {
+    "7070": { "label": "Tracedown (tracedown up)", "onAutoForward": "notify" },
+    "3000": { "label": "Web app (npm run dev)", "onAutoForward": "notify" }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python", "ms-python.vscode-pylance", "dbaeumer.vscode-eslint"],
+      "settings": {
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": ["-q"]
+      }
+    },
+    "codespaces": {
+      "openFiles": ["CONTRIBUTING.md"]
+    }
+  }
+}
