@@ -346,6 +346,19 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
                      request.client.host if request.client else None)
         return {"spans": spans, "blobs": blobs_for(spans)}
 
+    @api.get("/runs/{trace_id}/fix-check", tags=["replay"])
+    def fix_check(trace_id: str, replay: str, user_test: Optional[bool] = None,
+                  p: Principal = Depends(principal)) -> Dict[str, Any]:
+        """Did the replay ``replay`` fix run ``trace_id``? See tracedown_server/fixes.py."""
+        from .. import fixes
+        original = analysis(trace_id, spans_for(p, trace_id))
+        replay_spans = spans_for(p, replay)
+        rep = analysis(replay, replay_spans)
+        root = next((s for s in replay_spans if not s["parent_span_id"]), replay_spans[0])
+        if root["attributes"].get("tdn.replay.of") not in (None, trace_id):
+            raise HTTPException(400, f"run {replay} is a replay of another run")
+        return {"original": trace_id, "replay": replay, **fixes.check(original, rep, user_test)}
+
     @api.get("/runs/{trace_id}/graph", tags=["visualization"])
     def get_graph(trace_id: str, p: Principal = Depends(principal)) -> Dict[str, Any]:
         return build_graph(spans_for(p, trace_id))

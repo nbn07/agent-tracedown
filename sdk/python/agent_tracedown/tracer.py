@@ -75,6 +75,7 @@ class _Replay:
     served: List[int] = field(default_factory=list)
     live: List[int] = field(default_factory=list)
     first_divergence: Optional[int] = None
+    runs: List[str] = field(default_factory=list)  # trace ids of the runs this replay drove
 
     def recorded_for(self, step: int, kind: str) -> Optional[Dict[str, Any]]:
         if self.mode == "full":
@@ -244,6 +245,7 @@ def run(name: str, input: Any = None, **attrs: Any) -> Iterator[RunHandle]:
         root.set(k if "." in k else f"tdn.{k}", v)
     if replay:
         root.set("tdn.replay.of", replay.source_trace_id).set("tdn.replay.mode", replay.mode)
+        replay.runs.append(state.trace_id)
     if input is not None:
         root.input_digest = _put_blob(state, input)
     state.spans.append(root)
@@ -460,6 +462,19 @@ def tool_call(name: str, args: Dict[str, Any], fn: Callable[..., Any],
             if raise_on_error:
                 raise ToolError(msg)
             return None
+        rp = state.replay if state else None
+        if rp is not None and rp.overrides:
+            stubs = rp.overrides.get("tools") or {}
+            allowed = rp.overrides.get("live_tools", True)
+            if name in stubs:
+                fn = stubs[name]
+                if span is not None:
+                    span.set("tdn.replay.source", "stub")
+            elif allowed is not True and name not in (allowed or ()):
+                # A replay that only checks a fix must not book, refund or send for real.
+                if span is not None:
+                    span.error(f"blocked: {name} would run for real during a replay")
+                raise SideEffectBlocked(name)
         result = fn(**args)
         if span is not None:
             span.output_digest = _put_blob(state, result)
@@ -468,6 +483,15 @@ def tool_call(name: str, args: Dict[str, Any], fn: Callable[..., Any],
 
 class ToolError(RuntimeError):
     pass
+
+
+class SideEffectBlocked(RuntimeError):
+    """A replay reached a tool that would run for real, and live tools were not allowed."""
+
+    def __init__(self, tool: str):
+        super().__init__(f"{tool} would run for real during the replay. Pass a stub "
+                         f"(tools={{{tool!r}: fake}}) or allow it (live_tools=[{tool!r}]).")
+        self.tool = tool
 
 
 def retrieval(query: str, fn: Callable[[str], List[Dict[str, Any]]], source: Optional[str] = None,
