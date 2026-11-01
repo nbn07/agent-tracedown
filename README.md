@@ -47,6 +47,10 @@ pip install agent-tracedown-server
 tracedown up                                      # http://127.0.0.1:7070
 ```
 
+If 7070 is in use, `tracedown up` tries 7071 through 7079 and prints and opens the
+chosen URL. Use that port for your SDK endpoint too. Set `--port` or `TDN_PORT` to
+require a particular port; an occupied explicit port still stops startup.
+
 Needs Python 3.10+. A Mac's built-in Python is 3.9; with [uv](https://docs.astral.sh/uv/) instead: `uvx --python 3.12 --from agent-tracedown-server tracedown up`.
 
 Prefer the terminal? `tracedown demo` prints every diagnosis instead.

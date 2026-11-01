@@ -18,6 +18,8 @@ import urllib.error
 import urllib.request
 import webbrowser
 
+_DEFAULT_PORT = 7070
+
 
 def _wait_until_up(url: str, server, timeout: float = 20.0) -> bool:
     deadline = time.time() + timeout
@@ -78,13 +80,20 @@ def up(args: argparse.Namespace) -> int:
 
     from .api import create_app, web_available
 
-    if not _port_free(args.host, args.port):
-        print(f"Port {args.port} is in use. Try: tracedown up --port {args.port + 1}", file=sys.stderr)
+    port = args.port
+    if port is None:
+        port = next((p for p in range(_DEFAULT_PORT, _DEFAULT_PORT + 10) if _port_free(args.host, p)), None)
+        if port is None:
+            print(f"No free port in {_DEFAULT_PORT}-{_DEFAULT_PORT + 9}. "
+                  f"Try: tracedown up --port {_DEFAULT_PORT + 10}", file=sys.stderr)
+            return 1
+    elif not _port_free(args.host, port):
+        print(f"Port {port} is in use. Try: tracedown up --port {port + 1}", file=sys.stderr)
         return 1
     local = "127.0.0.1" if args.host in ("0.0.0.0", "::", "") else args.host  # where this process reaches itself
-    url = f"http://{local}:{args.port}"
+    url = f"http://{local}:{port}"
     app = create_app()
-    server = uvicorn.Server(uvicorn.Config(app, host=args.host, port=args.port, log_level="warning"))
+    server = uvicorn.Server(uvicorn.Config(app, host=args.host, port=port, log_level="warning"))
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
     if not _wait_until_up(url, server):
@@ -99,7 +108,7 @@ def up(args: argparse.Namespace) -> int:
         app.state.read_only = True  # after loading the demo: from now on, nobody can write
 
     page = url + "/runs/" if web_available() else url + "/"
-    where = f"   (listening on {args.host}:{args.port})" if local != args.host else ""
+    where = f"   (listening on {args.host}:{port})" if local != args.host else ""
     print(f"\nTracedown is running at {url}{where}   (data: {os.path.abspath(args.db)})")
     if args.read_only:
         print("Read-only: every write is refused from now on.")
@@ -133,7 +142,8 @@ def main(argv=None) -> int:
 
     u = sub.add_parser("up", help="start the server and web app, with demo runs, and open the browser")
     u.add_argument("--host", default=os.environ.get("TDN_HOST", "127.0.0.1"))
-    u.add_argument("--port", type=int, default=int(os.environ.get("TDN_PORT", "7070")))
+    u.add_argument("--port", type=int, default=os.environ.get("TDN_PORT"),
+                   help="port to use (default: first free port in 7070-7079; TDN_PORT fixes the port)")
     u.add_argument("--db", default=os.environ.get("TDN_DB") or default_db(),
                    help="SQLite file (default: ~/.tracedown/tracedown.db)")
     u.add_argument("--no-demo", action="store_true", help="do not load the demo runs into an empty database")
