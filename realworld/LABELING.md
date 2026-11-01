@@ -207,3 +207,19 @@ Along the way, a question in the agent's last turn ("Which date would you like?"
 | Always "agent" | 71% | 0 | n/a |
 
 The judge finds three times as many user-caused failures but is wrong 4 times in 10 when it says "user". Copilot's labels are themselves one AI's opinion, so some of these disagreements may be Copilot's mistakes. The answers are in `label-check/fault-judge-answers-haiku-5-5.jsonl`.
+
+## Do higher scores mean likelier right answers? No (2026-11-01)
+
+Each finding has a score that ranks the suspects. We checked whether the first guess is more often right when its score is high, using only saved judge answers (`python realworld/confidence_check.py`, no API calls):
+
+| First guess right | All runs | Score 0.8 or more |
+|---|---|---|
+| Who&When algorithm-generated, rules only | 21.4% | 33.3% (60 of 126 runs) |
+| Who&When algorithm-generated, Haiku 5.5 judge | 36.5% | 36.5% (all 126 runs) |
+| Who&When hand-crafted, rules only | 19.0% | 18.9% (53 of 58 runs) |
+| Who&When hand-crafted, Haiku 5.5 judge | 20.7% | 20.7% (all 58 runs) |
+| τ-bench test, rules only | 73.6% | 0 of 3 runs (1 of 5 at 0.7 or more) |
+
+The score does not separate right guesses from wrong ones. From v0.4.3 the stack trace and the web app no longer print it as a "confidence"; they show the suspects in order. The API keeps the field for ranking.
+
+A related finding on τ-bench: 378 of the 383 first guesses on the test split come from one rule, the point-of-no-return prior (the first state-changing call). Tracedown's 74% there is therefore mostly that prior, not deeper analysis.

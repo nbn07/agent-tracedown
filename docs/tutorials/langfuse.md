@@ -27,9 +27,9 @@ AgentFailureException: Unsupported claim (hallucination)
   run      lf-trace…  ResearchAgent  2026-10-29 14:00 UTC
   at        step 3  ResearchAgent → answer
               1 of 1 answer claims not supported by any source
-  root cause: Unsupported claim (hallucination) (confidence 0.75)
+  root cause: Unsupported claim (hallucination) (top suspect; check the evidence)
   evidence:   unsupported: "Acme Corp's 2025 revenue was $4.2 billion, up 12% year over year." (number(s) 12, 4.2 appear in no source)
-  also:       Tool failure (step 2, 0.30)
+  also:       Tool failure (step 2)
   next:       replay from step 3 with your fix: tdn.replay(bundle, mode="from-step", from_step=3)
 ```
 
@@ -38,9 +38,9 @@ AgentFailureException: Unsupported claim (hallucination)
 - **Header** — agent name, truncated trace id, step count, and outcome (failure / success).
 - **Exception type** — the high-level diagnosis (here an unsupported claim / hallucination).
 - **at step N** — the step where the symptom was observed.
-- **caused by / root cause** — the earlier step that produced the bad value, with a confidence score.
+- **caused by / root cause** — the earlier step that most likely produced the bad value: Tracedown's top suspect, not a certainty. Check its evidence.
 - **evidence** — concrete facts a human can check (quoted text, missing numbers, error messages).
-- **also** — secondary findings.
+- **also** — the next suspects, in order. Look here when the evidence for the top suspect does not fit.
 - **next** — suggested next action, usually a replay from the broken step.
 
 ## 3. Connect a real Langfuse project

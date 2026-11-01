@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { Activity, AlertTriangle, BarChart3, FileUp, GitCompare, ListTree, Network, Radio, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/cn";
-import { useReadOnly } from "@/lib/read-only";
+import { useReadOnly, useServerInfo } from "@/lib/read-only";
 import { ThemeToggle } from "./theme";
 import { SettingsButton } from "./settings";
 
@@ -34,6 +34,11 @@ function Brand() {
       <span className="font-display text-xl font-semibold tracking-wide">Tracedown</span>
     </Link>
   );
+}
+
+function Version() {
+  const { version } = useServerInfo();
+  return <span className="text-[11px] text-muted" title="Tracedown server version">{version ? `v${version}` : ""}</span>;
 }
 
 function DemoNote() {
@@ -72,7 +77,7 @@ export function Nav() {
         {links}
         <DemoNote />
         <div className="mt-auto flex items-center justify-between px-1">
-          <span className="text-[11px] text-muted">v0.3</span>
+          <Version />
           <div className="flex"><SettingsButton /><ThemeToggle /></div>
         </div>
       </aside>

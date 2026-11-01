@@ -9,7 +9,7 @@ export function Findings({ findings, onStep }: { findings: RootCause[]; onStep: 
       {findings.map((f, i) => (
         <li key={f.id} className={`rounded-lg border p-3 ${f.root_cause ? "border-cause/50 bg-cause-soft/40" : "border-line bg-panel"}`}>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-xs text-muted">#{i + 1}</span>
+            <span className="font-mono text-xs text-muted" title="Suspects in ranked order. The order is a best guess, not a probability.">#{i + 1}</span>
             <span className="font-semibold">{f.label}</span>
             {f.root_cause && <Badge tone="cause">root cause</Badge>}
             {f.symptom && <Badge tone="bad">symptom</Badge>}
@@ -17,11 +17,7 @@ export function Findings({ findings, onStep }: { findings: RootCause[]; onStep: 
               <button onClick={() => onStep(f.span_id)} className="text-xs text-accent underline underline-offset-2 cursor-pointer">step {f.step}</button>
             )}
             <span className="ml-auto flex items-center gap-2 text-xs text-muted">
-              <span className="hidden sm:inline">{humanize(f.detector)}</span>
-              <span className="inline-block h-1.5 w-16 overflow-hidden rounded bg-sunken" aria-hidden>
-                <span className="block h-full bg-cause" style={{ width: `${Math.round(f.confidence * 100)}%` }} />
-              </span>
-              <span className="tabular w-8 text-right">{Math.round(f.confidence * 100)}%</span>
+              <span className="hidden sm:inline">found by {humanize(f.detector)}</span>
             </span>
           </div>
           <p className="mt-1 text-sm">{f.title}</p>

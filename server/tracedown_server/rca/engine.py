@@ -232,13 +232,14 @@ def render_stack_trace(report: Dict[str, Any], run: RunView) -> str:
     fault = report.get("fault")
     if fault and fault["verdict"] in ("user", "unfinished"):
         who = {"user": "the user, not the agent", "unfinished": "nobody yet: the run was unfinished"}[fault["verdict"]]
-        lines.append(f"  fault:      {who} ({fault['confidence']:.2f}): {fault['reason']}")
-    lines.append(f"  root cause: {top['label']} (confidence {top['confidence']:.2f})")
+        lines.append(f"  fault:      {who}: {fault['reason']}")
+    # No number here: scores rank the suspects; they are not the chance of being right.
+    lines.append(f"  root cause: {top['label']} (top suspect; check the evidence)")
     for ev in top["evidence"][:3]:
         lines.append(f"  evidence:   {ev}")
     others = [f for f in report["findings"] if f["id"] not in (top["id"], lead["id"])]
     if others:
-        lines.append("  also:       " + "; ".join(f"{f['label']} (step {f['step']}, {f['confidence']:.2f})" for f in others[:3]))
+        lines.append("  also:       " + "; ".join(f"{f['label']} (step {f['step']})" for f in others[:3]))
     lines.append(f"  next:       replay from step {top['step']} with your fix: "
                  f"tdn.replay(bundle, mode=\"from-step\", from_step={top['step']})")
     return "\n".join(lines)

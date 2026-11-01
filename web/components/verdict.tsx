@@ -11,6 +11,6 @@ const HELP: Record<string, string> = {
 
 export function VerdictBadge({ fault }: { fault: Fault | null | undefined }) {
   if (!fault) return <span className="text-muted">—</span>;
-  return <Badge tone={verdictTone(fault.verdict)} title={`${HELP[fault.verdict] || ""} (${Math.round(fault.confidence * 100)}%)`}>{LABEL[fault.verdict] || fault.verdict}</Badge>;
+  return <Badge tone={verdictTone(fault.verdict)} title={HELP[fault.verdict] || ""}>{LABEL[fault.verdict] || fault.verdict}</Badge>;
 }
 export const verdictHelp = HELP;

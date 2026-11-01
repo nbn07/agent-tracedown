@@ -1,17 +1,24 @@
 "use client";
 import { useEffect, useState } from "react";
 
-// Whether the server refuses writes (`tracedown up --read-only`, the public demo).
-// Asked once per page load and shared by every component.
-let cached: Promise<boolean> | null = null;
+// What /healthz says about the server: its version, and whether it refuses writes
+// (`tracedown up --read-only`, the public demo). Asked once per page load.
+export interface ServerInfo { version: string | null; readOnly: boolean }
+let cached: Promise<ServerInfo> | null = null;
 
-export function useReadOnly(): boolean {
-  const [ro, setRo] = useState(false);
+export function useServerInfo(): ServerInfo {
+  const [info, setInfo] = useState<ServerInfo>({ version: null, readOnly: false });
   useEffect(() => {
-    cached ??= fetch("/healthz", { cache: "no-store" }).then(r => r.json()).then(h => Boolean(h.read_only)).catch(() => false);
+    cached ??= fetch("/healthz", { cache: "no-store" }).then(r => r.json())
+      .then(h => ({ version: typeof h.version === "string" ? h.version : null, readOnly: Boolean(h.read_only) }))
+      .catch(() => ({ version: null, readOnly: false }));
     let live = true;
-    cached.then(v => { if (live) setRo(v); });
+    cached.then(v => { if (live) setInfo(v); });
     return () => { live = false; };
   }, []);
-  return ro;
+  return info;
+}
+
+export function useReadOnly(): boolean {
+  return useServerInfo().readOnly;
 }

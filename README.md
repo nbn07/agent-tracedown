@@ -112,7 +112,7 @@ AgentFailureException: Invalid tool arguments
               start must be ISO-8601 date-time, got 'Friday'
   caused by step 4  PlannerAgent → chat gpt-4o-mini
               PlannerAgent produced 'Friday' at step 4, which calendar_create_event() could not use
-  root cause: Bad LLM output (confidence 0.88)
+  root cause: Bad LLM output (top suspect; check the evidence)
   evidence:   step 4 output 'Friday' is used verbatim in step 5 arguments
   next:       replay from step 4 with your fix: tdn.replay(bundle, mode="from-step", from_step=4)
 ```

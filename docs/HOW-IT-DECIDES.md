@@ -64,7 +64,18 @@ Every finding gets a score, starting from its confidence:
 | A document or memory read that no later step used | × 0.6, since it cannot have caused the failure |
 | A wording problem in a run that also changed something (refund, booking) | × 0.7, and never above the best finding on a tool call, since the action is the likelier cause |
 
-Scores are capped at 0.99. The top finding is the verdict; the next ones are shown as alternatives. **Scores are rule weights, not calibrated probabilities.** A 0.88 means "strong evidence of this kind", not "88% likely".
+Scores are capped at 0.99. The top finding is the verdict; the next ones are shown as alternatives. **Scores only put the suspects in order. They are not the chance of being right**, so Tracedown does not print them: the stack trace says "top suspect" and the web app shows the suspects in order.
+
+We checked whether a high score at least means a more likely right answer. It does not:
+
+| First guess right | All runs | Only runs scoring 0.8 or more |
+|---|---|---|
+| Who&When, algorithm-generated, rules only | 21% | 33% (48% of runs) |
+| Who&When, algorithm-generated, Haiku 5.5 judge | 37% | 37% (almost every run) |
+| Who&When, hand-crafted, rules only | 19% | 19% |
+| τ-bench test split, rules only | 74% | 1 of 5 runs scoring 0.7 or more |
+
+So treat every verdict the same way: as the first place to look, and check its evidence. The scores stay in the API (`confidence` on each finding) for ranking and for tools that need them.
 
 ## 5. The judge (optional)
 

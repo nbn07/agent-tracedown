@@ -9,7 +9,7 @@ export function FaultCard({ fault }: { fault: Fault }) {
       <div className="mt-1.5 flex flex-wrap items-center gap-2">
         <VerdictBadge fault={fault} />
         <span className="font-medium">{verdictHelp[fault.verdict]}</span>
-        <span className="text-xs text-muted tabular">confidence {Math.round(fault.confidence * 100)}%</span>
+        <span className="text-xs text-muted">{fault.source === "llm_judge" ? "from the LLM judge" : "from the rules"}</span>
       </div>
       <p className="mt-2 text-sm text-ink/85">{fault.reason}</p>
       {fault.hints && fault.hints.length > 0 && (
