@@ -344,6 +344,11 @@ _INJECTION = re.compile(
     r"(ignore (all |any |the )?(previous|prior|above|earlier) (instructions|prompts?|rules)|"
     r"disregard (all |any |the |your )?(previous|prior|above|earlier) (instructions|prompts?|rules)|"
     r"forget (all |your )?(previous|prior) instructions|new instructions\s*:|"
+    r"important\s*:\s*new task\b|"
+    r"assistant\s*[,;:]?\s+you\s+(must|need to|are required to)\s+(now\s+)?|"
+    r"as an ai model\s*,?\s+you are required to\b|"
+    r"ignorez\s+(toutes?\s+)?les instructions (précédentes|precedentes)|"
+    r"ignoriere\s+(alle\s+)?vorherigen anweisungen|"
     r"system (note|override|instruction)s?\s*:|do not (tell|inform|mention (this )?to) the user|"
     r"reveal (your|the) (system prompt|instructions)|you are now (in )?(developer|admin|dan)\b)", re.I)
 _TARGET = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+|https?://[^\s\"'<>)]+")
