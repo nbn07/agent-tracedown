@@ -2,8 +2,8 @@ apiVersion: v2
 name: tracedown
 description: Tracedown, the flight recorder for AI agents. API server, Kafka workers, web app, and optional bundled Postgres, Redis, Redpanda and ClickHouse.
 type: application
-version: 0.4.3
-appVersion: "0.4.3"
+version: 0.5.0
+appVersion: "0.5.0"
 home: https://github.com/nbn07/agent-tracedown
 sources: ["https://github.com/nbn07/agent-tracedown"]
 keywords: [ai-agents, observability, llm, opentelemetry, root-cause-analysis]
