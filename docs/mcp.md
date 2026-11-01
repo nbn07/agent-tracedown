@@ -56,9 +56,13 @@ Without uv: `pip install "agent-tracedown-server[mcp]"`, then use `tracedown` wi
 | `list_incidents` | Recurring problems: failed runs grouped by the same cause |
 | `diagnose_trace` | Diagnose a pasted Langfuse, OpenTelemetry or Tracedown export |
 
-All tools only read, except `diagnose_trace`, which imports the export into the `pasted` project, like "Diagnose a trace" in the web app. `get_step` shows step content, so the API key you give it needs permission to read payloads.
+No tool changes a run. `diagnose_trace` imports the pasted export into the `pasted` project, like "Diagnose a trace" in the web app, and `explain_run` asks the server to analyse a run that has not been analysed yet. Every tool except `diagnose_trace` is marked read-only, so clients that ask before each tool call can tell them apart.
+
+**API key permissions:** the tools need `runs:read`; `get_step` and `check_claims` also need `payloads:read`, because they show what the agent read and wrote; `diagnose_trace` needs `ingest`; and `explain_run` uses `analysis:run` when available (without it, runs that were never analysed say so). Reading a step's content is recorded in the audit log.
 
 ## Good to know
 
 - Verdicts are ranked suspects, not certainties, and the tools say so. A good assistant will quote the evidence and read the step before concluding.
+- Run ids may not contain `/ \ ? # %` or spaces; anything else is passed on safely.
+- Works with version 1.x and 2.x of the `mcp` Python package.
 - Fixes are tried inside your agent's code, so the MCP server can't run them. `suggest_fixes` gives the `tdn.try_fixes(...)` line to run where your agent runs; the results then show up in `suggest_fixes` and in the web app.
