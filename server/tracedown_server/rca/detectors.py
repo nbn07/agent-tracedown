@@ -189,7 +189,10 @@ def tool_errors(run: RunView) -> List[Finding]:
 
 
 _SUCCESS_CLAIM = re.compile(r"\b(confirmed|has been (placed|sent|booked|processed|cancelled|refunded)|"
-                            r"successfully|is on its way|will ship|all set|is done)\b", re.I)
+                            r"refund (?:has been |was )?issued|booking (is )?complete|"
+                            r"you(?:'re| are) all set|we(?:'ve| have) cancelled|"
+                            r"it(?:'s| is) on its way|successfully|is on its way|will ship|"
+                            r"all set|is done|done)\b", re.I)
 
 
 def _schema_errors(args: Any, schema: Optional[Dict[str, Any]]) -> Optional[List[str]]:
