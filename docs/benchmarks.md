@@ -8,7 +8,8 @@ Tracedown publishes how often it finds the right step on public benchmarks, incl
 
 | Right step | First guess | In top three |
 |---|---|---|
-| **Tracedown with an LLM judge** (Claude Haiku 5.5) | **36.5% · 20.7%** | **50.8% · 32.8%** |
+| **Tracedown with a Claude Sonnet 5.5 judge** | **42.9% · 24.1%** | **58.7% · 36.2%** |
+| Tracedown with a Claude Haiku 5.5 judge (cheaper) | 36.5% · 20.7% | 50.8% · 32.8% |
 | Tracedown, rules only | 21.4% · 19.0% | 33.3% · 31.0% |
 | Baseline: first failure-looking output | 23.0% · 15.5% | – |
 | Baseline: random step | 12.0% · 4.2% | 36.0% · 12.5% |
@@ -16,7 +17,9 @@ Tracedown publishes how often it finds the right step on public benchmarks, incl
 
 The first guess is wrong more often than it is right. On the algorithm-generated set, rules alone are no better than a random pick within the top three; the judge is what lifts it.
 
-Scored the strict way some papers use (agent and step both right, all 184 runs), Tracedown with a Claude Haiku 5.5 judge reaches 31.5%, and AgentDebugX with Qwen 3.5 9B reaches 28.8%. The models differ, so neither is a clear winner.
+A stronger judge helps most on the algorithm-generated set. On the hand-crafted set the rules answer confidently in most logs, so the judge is rarely asked; that is the next thing to improve.
+
+Scored the strict way some papers use (agent and step both right, all 184 runs), Tracedown reaches 36.4% with a Claude Sonnet 5.5 judge and 31.5% with Claude Haiku 5.5, and AgentDebugX with Qwen 3.5 9B reaches 28.8%. The models differ, so this compares setups, not methods.
 
 ## τ-bench
 

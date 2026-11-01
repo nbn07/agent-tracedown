@@ -114,6 +114,7 @@ On [Who&When](https://github.com/nbn07/agent-tracedown/blob/main/realworld/whowh
 
 | | Right step, first guess | Right step in top three |
 |---|---|---|
+| With a Claude Sonnet 5.5 judge | 42.9% / 24.1% | 58.7% / 36.2% |
 | With a Claude Haiku 5.5 judge | 36.5% / 20.7% | 50.8% / 32.8% |
 | Rules only | 21.4% / 19.0% | 33.3% / 31.0% |
 

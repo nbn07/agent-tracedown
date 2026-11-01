@@ -51,6 +51,8 @@ Some papers report one "strict" number: the run counts only when the predicted a
 
 | | Agent + step (strict) | Agent |
 |---|---|---|
+| **Tracedown + judge (Claude Sonnet 5.5), without ground truth** | **36.4%** | **60.3%** |
+| Tracedown + judge (Claude Sonnet 5.5), with ground truth | 37.5% | 62.0% |
 | Tracedown + judge (Claude Haiku 5.5), without ground truth | 31.5% | 56.5% |
 | Tracedown + judge (Claude Haiku 5.5), with ground truth | 34.8% | 60.3% |
 | Tracedown, rules only | 20.7% | 51.1% |
@@ -102,3 +104,17 @@ One run, no tuning on Who&When. The judge is asked only when the best rule findi
 
 - **Joint agent-and-step accuracy** (the metric AgentDebugX reports, about 29% with a 9B model) is 36.5% on Algorithm-Generated and 20.7% on Hand-Crafted without ground truth. The settings differ, so this is indicative only.
 - **Hand-Crafted barely changes** because the rules rarely hand over to the judge there. Lowering that threshold would be a change to test on other data first.
+
+## With a stronger judge (Claude Sonnet 5.5), 2026-11-01
+
+The same engine and prompt, one run, no tuning on Who&When, run by the `judge-benchmark` workflow (Actions). Its 142 answers are in `judge-answers-sonnet-5-5.jsonl`; `python realworld/whowhen/score.py --judge anthropic:claude-sonnet-5-5` rescores from them without new calls. Full results: `results-judge-sonnet-5-5.json`. The run cost under one US dollar.
+
+| Without ground truth | Alg. agent | Alg. step | Alg. top 3 | Hand agent | Hand step | Hand top 3 |
+|---|---|---|---|---|---|---|
+| **Tracedown + Sonnet 5.5 judge** | **62.7%** | **42.9%** | **58.7%** | **55.2%** | **24.1%** | **36.2%** |
+| Tracedown + Haiku 5.5 judge | 57.9% | 36.5% | 50.8% | 53.4% | 20.7% | 32.8% |
+| Tracedown, rules only | 50.8% | 21.4% | 33.3% | 51.7% | 19.0% | 31.0% |
+
+- **A stronger judge helps on Algorithm-Generated** (+6.4 points on the first guess, +7.9 in the top three), where the judge is asked in about half the logs.
+- **Hand-Crafted moves little** (+3.4 points) for the same reason as before: the rules answer with a high score in most logs, mostly from the loop detector, and the judge is rarely consulted. Making the judge see more of these logs is the next thing to test, on data other than Who&When.
+- **Strict agent-and-step, all 184 logs:** 36.4% with Sonnet 5.5, 31.5% with Haiku 5.5, against 28.8% published for AgentDebugX with Qwen 3.5 9B. Different models, so not a like-for-like comparison of the methods.

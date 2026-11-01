@@ -155,7 +155,8 @@ Tracedown also exports: OTLP to Jaeger, Tempo, Datadog or any collector, and Pro
 
 | Right step | First guess<br/><sub>algorithm · hand-crafted</sub> | In top three<br/><sub>algorithm · hand-crafted</sub> |
 |---|---|---|
-| **Tracedown with an LLM judge** (Claude Haiku 5.5) | **36.5% · 20.7%** | **50.8% · 32.8%** |
+| **Tracedown with a Claude Sonnet 5.5 judge** | **42.9% · 24.1%** | **58.7% · 36.2%** |
+| Tracedown with a Claude Haiku 5.5 judge (cheaper) | 36.5% · 20.7% | 50.8% · 32.8% |
 | Tracedown, rules only | 21.4% · 19.0% | 33.3% · 31.0% |
 | Baseline: first failure-looking output | 23.0% · 15.5% | – |
 | Baseline: random step | 12.0% · 4.2% | 36.0% · 12.5% |
@@ -180,7 +181,7 @@ Tracedown is a root-cause layer that works alongside your tracing tool, not a re
 | [Langfuse](https://langfuse.com) | MIT core | No | No | – | – |
 | LangSmith, Arize AX, Galileo | Commercial | Yes | Not documented | No | No |
 
-AgentDebugX is the closest project. Scored the same way on Who&When (agent and step both right, all 184 runs), Tracedown with a Claude Haiku 5.5 judge reaches 31.5% and AgentDebugX with Qwen 3.5 9B reaches 28.8%; the models differ, so neither is a clear winner.
+AgentDebugX is the closest project. Scored the same way on Who&When (agent and step both right, all 184 runs), Tracedown reaches 36.4% with a Claude Sonnet 5.5 judge and 31.5% with Claude Haiku 5.5; AgentDebugX with Qwen 3.5 9B reaches 28.8%. The models differ, so this compares setups, not methods.
 
 <sub>Based on each project's documentation, the <a href="https://arxiv.org/abs/2607.18754">AgentDebugX paper</a> and <a href="https://arize.com/resources/best-ai-agent-debugging-tools/">Arize's 2026 comparison</a>, October 2026. Something out of date? <a href="https://github.com/nbn07/agent-tracedown/issues/new">Open an issue</a>.</sub>
 
