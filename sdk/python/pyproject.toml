@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-tracedown"
-version = "0.4.3"
+version = "0.5.0"
 description = "The flight recorder for AI agents: find the step that caused a failure, then replay the run with a fix."
 readme = "README.md"
 requires-python = ">=3.9"

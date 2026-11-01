@@ -117,7 +117,50 @@ This is how the demo traces "$120" back to an outdated refund policy. Matching i
 
 Replay runs your agent again from the blamed step, with your fix. Steps before it come from the recording; from that step on, the agent runs live. Replay runs inside your agent's code through the SDK, so it needs a run recorded with the [Python](https://github.com/nbn07/agent-tracedown/blob/main/sdk/python/README.md) or [TypeScript](https://github.com/nbn07/agent-tracedown/blob/main/sdk/typescript/README.md) SDK. Runs imported from Langfuse or OpenTelemetry get the full diagnosis, but cannot be replayed on their own.
 
-Tracedown does not write the fix yet. You write it; replay shows whether it works. Suggested and proven fixes are on the [roadmap](https://github.com/nbn07/agent-tracedown#roadmap).
+Tracedown does not write the fix yet. You write it; replay shows whether it works. Suggested fixes are on the [roadmap](https://github.com/nbn07/agent-tracedown#roadmap).
+
+## Did the fix work? (preview, Python SDK)
+
+Think of a mechanic who swaps the part they blamed and then takes the car for a test drive. If the warning light stays off, they blamed the right part.
+
+A replay passes only if all of these hold:
+
+1. **The blamed problem is gone**: the root cause's kind of problem no longer shows up at that step. For made-up or outdated claims, it must not show up anywhere.
+2. **Nothing new broke**: no new kind of problem with a score of 0.7 or more.
+3. **The run finished**: no unhandled error.
+4. **Your own test passed**, if you gave one.
+
+The run's own success or failure flag is not used, because many agents set it from outside, after the fact. The API is `GET /api/v1/runs/{id}/fix-check?replay=<replay id>`.
+
+To check that the blamed model step really was the cause, give the output it should have returned:
+
+```python
+report = tdn.confirm_cause(trace_id, corrected='{"start": "2026-11-06T15:00:00-05:00"}',
+                           agent=lambda: calendar_agent(),
+                           tools={"calendar_create_event": fake_create_event})
+report["verdict"]   # "cause_confirmed", "not_confirmed" or "blocked"
+```
+
+Tracedown replays the run from that step with your corrected output, three times by default, and every replay must pass. Models are not deterministic, so one lucky pass proves little.
+
+**No tool runs for real during these replays.** If the agent reaches a tool, the replay stops with `blocked` unless you pass a stand-in (`tools=`) or name the tools that are safe to run (`live_tools=["search"]`). A check should never book, refund or send anything.
+
+### Suggested fixes
+
+`GET /api/v1/runs/{id}/suggestions` lists what to change, for the root cause and up to two other suspects, one per kind of problem. For some, Tracedown can try the fix itself without touching your code:
+
+| Problem | What Tracedown tries |
+|---|---|
+| A model step wrote a value a tool rejected (for example "Friday" for a date) | Replay from that step with an instruction added to its prompt, built from the tool's error |
+| An unsupported claim | Replay from the model step with "use only facts from the context" added to its prompt |
+| An outdated document | Replay from the retrieval without the documents marked outdated |
+| Hidden instructions in a document | Replay from the retrieval without that source |
+
+`tdn.try_fixes(trace_id, agent=...)` runs each of these with the same check as above, three times, and labels it **works**, **does not work** or **blocked**. Other problems, such as loops or a tool that keeps failing, need a change in your code: they come back as **not tried**, with what to change. When the user, not the agent, was at fault, the suggestion says so and nothing is tried.
+
+In the web app, the **Fixes** tab of a failed run lists the suggestions with their results, and a replay's page says whether it fixed the run.
+
+A fix that works in the replay is a strong hint, not a guarantee: an added instruction can help this run and not the next. Keep the replays as tests.
 
 ## How often it is right
 

@@ -12,18 +12,19 @@ What's done, what's being built, and what's next. Requests with a real failing r
 | 0.4.2 | Tidier read-only [public demo](https://tracedown-demo.onrender.com/runs/) |
 | 0.4.3 | "Top suspect" instead of confidence numbers, after measuring that scores don't predict correctness; Sonnet judge results published |
 
-## In progress: v0.5 "Proven fixes"
+## v0.5.0 "Proven fixes" (released)
 
 Like a mechanic who swaps the part and takes the car for a test drive.
 
 - [x] **Fix check:** a replay passes only if the blamed problem is gone, nothing new broke, the run finished, and your own test passed (`GET /api/v1/runs/{id}/fix-check`)
 - [x] **`tdn.confirm_cause()`:** replay from the blamed model step with the output it should have given; three tries, all must pass
 - [x] **No real side effects during checks:** tools are blocked unless you give a stand-in or name them as safe
-- [ ] **Suggested fixes** for common problems (date formats, outdated sources, loops), each tested with the same check; LLM-worded suggestions only when a judge is turned on
-- [ ] **In the web app:** "Test this fix" on a failed run, with the result
+- [x] **Suggested fixes** for common problems, and `tdn.try_fixes()` to try each one with the same check (prompt instruction for bad values and made-up facts, leaving out outdated or injected documents; loops and failing tools get advice only)
+- [ ] LLM-worded suggestions when a judge is turned on
+- [x] **In the web app:** a Fixes tab on each failed run (suggestions, whether each one worked, and the code to try them), and "Did this replay fix the run?" on every replay
 - [ ] TypeScript SDK support (planned for v0.6)
 
-Work happens on the [`proven-fixes`](https://github.com/nbn07/agent-tracedown/tree/proven-fixes) branch.
+Still to come: LLM-worded suggestions when a judge is on, and the TypeScript SDK (v0.6).
 
 ## Next
 

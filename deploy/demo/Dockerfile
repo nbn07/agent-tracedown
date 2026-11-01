@@ -4,7 +4,7 @@
 #
 # Hosting steps (Hugging Face Spaces or Render, both free) are in deploy/demo/README.md.
 FROM python:3.12-slim
-ARG TRACEDOWN_VERSION=0.4.3
+ARG TRACEDOWN_VERSION=0.5.0
 RUN pip install --no-cache-dir "agent-tracedown-server==${TRACEDOWN_VERSION}" \
  && useradd --create-home demo
 USER demo

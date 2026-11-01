@@ -7,7 +7,7 @@
 
 ### Find the step that caused your AI agent's failure.
 
-Your tracing tool shows what your agent did. Tracedown tells you which step broke it, shows the evidence, and replays the run with your fix. Open source, and it works on top of the traces you already have.
+Your tracing tool shows what your agent did. Tracedown tells you which step broke it, shows the evidence, suggests a fix and proves whether it works. Open source, and it works on top of the traces you already have.
 
 [![CI](https://github.com/nbn07/agent-tracedown/actions/workflows/ci.yml/badge.svg)](https://github.com/nbn07/agent-tracedown/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/agent-tracedown-server?label=PyPI)](https://pypi.org/project/agent-tracedown-server/)
@@ -34,6 +34,7 @@ Tracedown is the flight recorder that also reads the recording. It walks back fr
 - **Works with what you have.** Import failed runs from Langfuse, Arize Phoenix or any OpenTelemetry exporter with no code changes, or add one line to [13 frameworks](#integrations).
 - **Explains the failure.** The root cause, the evidence, and a verdict on who was at fault: the agent, or the user.
 - **Replays with your fix.** Earlier steps come from the recording; from the broken step on, the agent runs live with your change. Needs a run recorded with the SDK.
+- **Proves the fix works.** Tracedown suggests a fix, replays the run with it three times, and checks that the problem is gone and nothing new broke: `tdn.try_fixes(trace_id, agent=...)`. No tool runs for real during the check. Python SDK for now.
 - **Runs without an LLM.** Diagnosis is rules first: instant, free and private. An inexpensive LLM judge is optional.
 - **Measured.** Accuracy on a public, human-labelled benchmark is [published](#benchmarks), losses included.
 - **Free and self-hosted.** Apache-2.0, every feature, including SSO, roles, audit log and scale-out storage.
@@ -246,7 +247,7 @@ helm install tracedown deploy/helm/tracedown
 
 ## Roadmap
 
-- **Proven fixes** (in progress for v0.5): suggest a fix, replay the run with it, and show that it now passes. Done so far: the check that decides whether a replay fixed the run, and `tdn.confirm_cause()`
+- **Proven fixes in TypeScript**, and suggestions worded by the LLM judge when one is turned on
 - **MCP server**, to ask "why did run X fail?" from Claude Code, Cursor or any MCP client
 - **GitHub Action** that runs your agent's test conversations on every pull request
 - **Write-back to Langfuse and Phoenix**, so the verdict appears in the tool you already use

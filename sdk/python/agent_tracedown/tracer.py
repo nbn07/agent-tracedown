@@ -25,7 +25,7 @@ from typing import Any, Callable, Dict, Iterator, List, Optional
 from .exporters import ConsoleExporter, Exporter, HttpExporter
 from .spans import Span, new_trace_id
 
-SDK_VERSION = "0.4.3"
+SDK_VERSION = "0.5.0"
 
 
 # --------------------------------------------------------------------------- config
@@ -75,6 +75,7 @@ class _Replay:
     served: List[int] = field(default_factory=list)
     live: List[int] = field(default_factory=list)
     first_divergence: Optional[int] = None
+    runs: List[str] = field(default_factory=list)  # trace ids of the runs this replay drove
 
     def recorded_for(self, step: int, kind: str) -> Optional[Dict[str, Any]]:
         if self.mode == "full":
@@ -244,6 +245,9 @@ def run(name: str, input: Any = None, **attrs: Any) -> Iterator[RunHandle]:
         root.set(k if "." in k else f"tdn.{k}", v)
     if replay:
         root.set("tdn.replay.of", replay.source_trace_id).set("tdn.replay.mode", replay.mode)
+        replay.runs.append(state.trace_id)
+        if replay.overrides.get("suggestion"):
+            root.set("tdn.replay.suggestion", replay.overrides["suggestion"])
     if input is not None:
         root.input_digest = _put_blob(state, input)
     state.spans.append(root)
@@ -363,6 +367,26 @@ def _record_tool_error(rec_span: Dict[str, Any]) -> Optional[str]:
     return st.get("message") if st.get("code") == "ERROR" else None
 
 
+def _with_note(prompt: Any, note: str) -> Any:
+    """Add an instruction to a prompt of any common shape (a replay that tests a suggested fix)."""
+    if isinstance(prompt, str):
+        return f"{prompt}\n\n{note}"
+    if isinstance(prompt, list):
+        return list(prompt) + [{"role": "system", "content": note}]
+    if isinstance(prompt, dict):
+        out = dict(prompt)
+        key = "system" if isinstance(out.get("system"), str) else "instructions"
+        out[key] = f"{out[key]}\n\n{note}" if isinstance(out.get(key), str) else note
+        return out
+    return prompt
+
+
+def _drop_chunks(chunks: List[Dict[str, Any]], rule: Dict[str, Any]) -> List[Dict[str, Any]]:
+    sources, ids = set(rule.get("sources") or ()), set(rule.get("ids") or ())
+    return [c for c in chunks if not (isinstance(c, dict) and (
+        (rule.get("stale") and c.get("stale")) or c.get("source") in sources or c.get("id") in ids))]
+
+
 def llm_call(fn: Callable[..., Any], *, prompt: Any, model: str, provider: str = "custom",
              temperature: Optional[float] = None, seed: Optional[int] = None,
              context_limit: Optional[int] = None, prompt_version: Optional[str] = None,
@@ -377,6 +401,8 @@ def llm_call(fn: Callable[..., Any], *, prompt: Any, model: str, provider: str =
         temperature = rp.overrides.get("temperature", temperature)
         prompt = rp.overrides.get("prompt", prompt)
         fn = rp.overrides.get("llm_fn", fn)
+        if rp.overrides.get("prompt_note"):
+            prompt = _with_note(prompt, rp.overrides["prompt_note"])
     with _span_ctx(f"chat {model}", "llm", **{
         "gen_ai.request.model": model, "gen_ai.provider.name": provider,
         "gen_ai.request.temperature": temperature, "gen_ai.request.seed": seed,
@@ -460,6 +486,19 @@ def tool_call(name: str, args: Dict[str, Any], fn: Callable[..., Any],
             if raise_on_error:
                 raise ToolError(msg)
             return None
+        rp = state.replay if state else None
+        if rp is not None and rp.overrides:
+            stubs = rp.overrides.get("tools") or {}
+            allowed = rp.overrides.get("live_tools", True)
+            if name in stubs:
+                fn = stubs[name]
+                if span is not None:
+                    span.set("tdn.replay.source", "stub")
+            elif allowed is not True and name not in (allowed or ()):
+                # A replay that only checks a fix must not book, refund or send for real.
+                if span is not None:
+                    span.error(f"blocked: {name} would run for real during a replay")
+                raise SideEffectBlocked(name)
         result = fn(**args)
         if span is not None:
             span.output_digest = _put_blob(state, result)
@@ -470,17 +509,34 @@ class ToolError(RuntimeError):
     pass
 
 
+class SideEffectBlocked(RuntimeError):
+    """A replay reached a tool that would run for real, and live tools were not allowed."""
+
+    def __init__(self, tool: str):
+        super().__init__(f"{tool} would run for real during the replay. Pass a stub "
+                         f"(tools={{{tool!r}: fake}}) or allow it (live_tools=[{tool!r}]).")
+        self.tool = tool
+
+
 def retrieval(query: str, fn: Callable[[str], List[Dict[str, Any]]], source: Optional[str] = None,
               kb_snapshot: Optional[str] = None) -> List[Dict[str, Any]]:
     """Retrieve chunks. Each chunk: {id, text, source, score, version?, stale?}.
     ``kb_snapshot`` names the index build, so drift reports can compare knowledge-base versions."""
     state = _run.get()
+    rp = state.replay if state else None
+    drop = (rp.overrides.get("retrieval_drop") if rp and rp.overrides else None) or None
+    if drop and drop.get("steps") is not None and state.step not in drop["steps"]:
+        drop = None
     with _span_ctx("retrieval", "retrieval", **{"tdn.retrieval.query": query, "tdn.retrieval.source": source,
                                                  "tdn.kb.snapshot": kb_snapshot}) as span:
         if span is not None:
             span.input_digest = _put_blob(state, query)
         served = _replayable(span, "retrieval", query)
         chunks = served[0] if served else fn(query)
+        if drop and not served:
+            chunks = _drop_chunks(chunks, drop)
+            if span is not None:
+                span.set("tdn.replay.dropped", drop)
         if span is not None:
             span.output_digest = _put_blob(state, chunks)
             span.set("tdn.retrieval.count", len(chunks))

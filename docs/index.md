@@ -2,7 +2,7 @@
 
 **Find the step that caused your AI agent's failure.**
 
-Your tracing tool shows what your agent did. Tracedown tells you which step broke it, shows the evidence, and replays the run with your fix. It is open source (Apache-2.0, every feature free) and works on top of the traces you already have.
+Your tracing tool shows what your agent did. Tracedown tells you which step broke it, shows the evidence, suggests a fix and proves whether it works. It is open source (Apache-2.0, every feature free) and works on top of the traces you already have.
 
 ![A support agent promises a $120 refund; the right answer is $80. Tracedown traces the claim to an outdated refund policy at step 2 and replays the run with the current one.](demo.gif)
 
@@ -25,6 +25,7 @@ Your tracing tool shows what your agent did. Tracedown tells you which step brok
 - **Who was at fault:** the agent, the user, or nobody yet.
 - **Each claim checked:** every sentence of the answer, with the source it came from, or none.
 - **Replay with your fix:** re-run from the broken step; earlier steps come from the recording.
+- **Proven fixes:** suggested fixes, each replayed three times and checked: works, or did not work, and why.
 
 ## Links
 

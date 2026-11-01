@@ -101,6 +101,11 @@ def load(endpoint, verbose=True):
         {"spans": tap.trace(ids["calendar"]), "blobs": tap.blobs}
     with tdn.replay(bundle, mode="from-step", from_step=4):
         replay_id = demo.calendar_agent(extractor=demo.extract_event_fixed)
+    if endpoint:  # try Tracedown's own suggested fixes, so the Fixes tab shows results
+        stand_ins = {"calendar_create_event": demo.create_event}
+        for story in ("calendar", "refund", "pricing", "injection"):
+            for r in tdn.try_fixes(ids[story], agent=demo.ALL[story], tools=stand_ins, tries=1, endpoint=endpoint):
+                say(f"fix for {story}: {r['verdict']}")
     return ids, tap, replay_id
 
 

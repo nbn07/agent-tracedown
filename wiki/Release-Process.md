@@ -21,6 +21,7 @@ flowchart LR
    - `sdk/python/pyproject.toml` and `SDK_VERSION` in `sdk/python/agent_tracedown/tracer.py`
    - `server/pyproject.toml` and `__version__` in `server/tracedown_server/__init__.py`
    - `sdk/typescript/package.json` and `sdk/typescript/src/version.ts`
+   - Also: the server's `agent-tracedown>=…,<…` dependency in `server/pyproject.toml` (raise it when the server needs new SDK features), `deploy/helm/tracedown/Chart.yaml`, and the OTLP scope version in `server/tracedown_server/otlp.py` and `sdk/python/agent_tracedown/exporters/__init__.py`. `grep -rn "<old version>"` finds them all.
 2. **Update** the README or docs if behaviour changed, and `deploy/demo/Dockerfile` (`ARG TRACEDOWN_VERSION`).
 3. **Push to `main`** and wait for CI to pass.
 4. **Create the release** on GitHub: **Releases → Draft a new release → Choose a tag → `vX.Y.Z` (create on publish)**. Title `vX.Y.Z: <one-line summary>`, notes in plain words: what's new, what's fixed, how to upgrade. Click **Publish release**.

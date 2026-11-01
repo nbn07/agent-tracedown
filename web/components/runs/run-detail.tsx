@@ -20,6 +20,7 @@ import { Waterfall } from "./waterfall";
 import { SpanPanel } from "./span-panel";
 import { ClaimsView } from "./claims";
 import { ReplayPlanner } from "./replay";
+import { FixCheckBanner, SuggestedFixes } from "./fixes";
 
 export function RunDetailPage() {
   const id = useRouteId();
@@ -35,6 +36,8 @@ export function RunDetailPage() {
   const causeSpan = report?.root_cause?.span_id ?? null;
   const selectedSpan = useMemo(() => data?.spans.find(s => s.span_id === selected) || null, [data, selected]);
   const steps = useMemo(() => (data?.spans || []).map(stepOf).sort((a, b) => a - b), [data]);
+  const toolNames = useMemo(() => [...new Set((data?.spans || []).filter(s => s.kind === "tool")
+    .map(s => String(s.attributes["gen_ai.tool.name"] ?? "")).filter(Boolean))], [data]);
   const myReplays = (replays.data?.runs || []).filter(r => r.replay_of === id);
   // When the answer itself is the problem, open on the claims, sentence by sentence.
   const causeCategory = report?.root_cause?.category;
@@ -48,6 +51,7 @@ export function RunDetailPage() {
   const run = data.run;
 
   const select = (spanId: string) => { setSelected(spanId); if (tab !== "graph" && tab !== "timeline") setTab("graph"); };
+  const selectStep = (step: number) => { const s = data.spans.find(x => stepOf(x) === step); if (s) select(s.span_id); };
   const analyze = () => { setAnalyzing(true); api(`/runs/${id}/analyze`, { method: "POST" }).then(reload).finally(() => setAnalyzing(false)); };
 
   return (
@@ -79,6 +83,8 @@ export function RunDetailPage() {
         </div>
       </div>
 
+      {run.replay_of && <FixCheckBanner original={run.replay_of} replay={run.trace_id} />}
+
       {report?.stack_trace && (report.outcome === "failure" || findings.length > 0) ? (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
           <Panel title="AI stack trace" eyebrow="What went wrong" bodyClass="p-3"><StackTrace text={report.stack_trace} /></Panel>
@@ -89,7 +95,10 @@ export function RunDetailPage() {
                 <div className="eyebrow">Root cause</div>
                 <p className="mt-1 font-semibold text-cause">{report.root_cause.label} · step {report.root_cause.step}</p>
                 <p className="mt-1 text-sm">{report.root_cause.title}</p>
-                <button className="mt-2 text-sm text-accent underline underline-offset-2 cursor-pointer" onClick={() => select(report.root_cause!.span_id)}>Show in graph</button>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                  <button className="text-accent underline underline-offset-2 cursor-pointer" onClick={() => select(report.root_cause!.span_id)}>Show in graph</button>
+                  <button className="text-accent underline underline-offset-2 cursor-pointer" onClick={() => setTab("fixes")}>Suggested fixes</button>
+                </div>
               </div>
             )}
           </div>
@@ -108,6 +117,7 @@ export function RunDetailPage() {
             { id: "timeline", label: "Timeline", content: <Waterfall spans={data.spans} selected={selected} onSelect={setSelected} cause={causeSpan} /> },
             { id: "findings", label: `Findings (${findings.length})`, content: <Findings findings={findings} onStep={select} /> },
             { id: "claims", label: "Claims", content: claims.error ? <ErrorState error={claims.error} /> : claims.data ? <ClaimsView data={claims.data} onStep={select} /> : <Loading rows={3} /> },
+            ...(report?.root_cause ? [{ id: "fixes", label: "Fixes", content: <SuggestedFixes traceId={id} onStep={selectStep} tools={toolNames} /> }] : []),
             { id: "replay", label: "Replay", content: <ReplayPlanner traceId={id} defaultStep={report?.root_cause?.step ?? null} steps={steps} /> },
           ]} />
         </Panel>
