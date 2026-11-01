@@ -145,6 +145,21 @@ Tracedown replays the run from that step with your corrected output, three times
 
 **No tool runs for real during these replays.** If the agent reaches a tool, the replay stops with `blocked` unless you pass a stand-in (`tools=`) or name the tools that are safe to run (`live_tools=["search"]`). A check should never book, refund or send anything.
 
+### Suggested fixes
+
+`GET /api/v1/runs/{id}/suggestions` lists what to change, for the root cause and up to two other suspects, one per kind of problem. For some, Tracedown can try the fix itself without touching your code:
+
+| Problem | What Tracedown tries |
+|---|---|
+| A model step wrote a value a tool rejected (for example "Friday" for a date) | Replay from that step with an instruction added to its prompt, built from the tool's error |
+| An unsupported claim | Replay from the model step with "use only facts from the context" added to its prompt |
+| An outdated document | Replay from the retrieval without the documents marked outdated |
+| Hidden instructions in a document | Replay from the retrieval without that source |
+
+`tdn.try_fixes(trace_id, agent=...)` runs each of these with the same check as above, three times, and labels it **works**, **does not work** or **blocked**. Other problems, such as loops or a tool that keeps failing, need a change in your code: they come back as **not tried**, with what to change. When the user, not the agent, was at fault, the suggestion says so and nothing is tried.
+
+A fix that works in the replay is a strong hint, not a guarantee: an added instruction can help this run and not the next. Keep the replays as tests.
+
 ## How often it is right
 
 On [Who&When](https://github.com/nbn07/agent-tracedown/blob/main/realworld/whowhen/README.md), a public benchmark of 184 failed multi-agent runs labelled by people:

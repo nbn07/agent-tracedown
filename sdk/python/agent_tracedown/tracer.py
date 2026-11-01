@@ -365,6 +365,26 @@ def _record_tool_error(rec_span: Dict[str, Any]) -> Optional[str]:
     return st.get("message") if st.get("code") == "ERROR" else None
 
 
+def _with_note(prompt: Any, note: str) -> Any:
+    """Add an instruction to a prompt of any common shape (a replay that tests a suggested fix)."""
+    if isinstance(prompt, str):
+        return f"{prompt}\n\n{note}"
+    if isinstance(prompt, list):
+        return list(prompt) + [{"role": "system", "content": note}]
+    if isinstance(prompt, dict):
+        out = dict(prompt)
+        key = "system" if isinstance(out.get("system"), str) else "instructions"
+        out[key] = f"{out[key]}\n\n{note}" if isinstance(out.get(key), str) else note
+        return out
+    return prompt
+
+
+def _drop_chunks(chunks: List[Dict[str, Any]], rule: Dict[str, Any]) -> List[Dict[str, Any]]:
+    sources, ids = set(rule.get("sources") or ()), set(rule.get("ids") or ())
+    return [c for c in chunks if not (isinstance(c, dict) and (
+        (rule.get("stale") and c.get("stale")) or c.get("source") in sources or c.get("id") in ids))]
+
+
 def llm_call(fn: Callable[..., Any], *, prompt: Any, model: str, provider: str = "custom",
              temperature: Optional[float] = None, seed: Optional[int] = None,
              context_limit: Optional[int] = None, prompt_version: Optional[str] = None,
@@ -379,6 +399,8 @@ def llm_call(fn: Callable[..., Any], *, prompt: Any, model: str, provider: str =
         temperature = rp.overrides.get("temperature", temperature)
         prompt = rp.overrides.get("prompt", prompt)
         fn = rp.overrides.get("llm_fn", fn)
+        if rp.overrides.get("prompt_note"):
+            prompt = _with_note(prompt, rp.overrides["prompt_note"])
     with _span_ctx(f"chat {model}", "llm", **{
         "gen_ai.request.model": model, "gen_ai.provider.name": provider,
         "gen_ai.request.temperature": temperature, "gen_ai.request.seed": seed,
@@ -499,12 +521,20 @@ def retrieval(query: str, fn: Callable[[str], List[Dict[str, Any]]], source: Opt
     """Retrieve chunks. Each chunk: {id, text, source, score, version?, stale?}.
     ``kb_snapshot`` names the index build, so drift reports can compare knowledge-base versions."""
     state = _run.get()
+    rp = state.replay if state else None
+    drop = (rp.overrides.get("retrieval_drop") if rp and rp.overrides else None) or None
+    if drop and drop.get("steps") is not None and state.step not in drop["steps"]:
+        drop = None
     with _span_ctx("retrieval", "retrieval", **{"tdn.retrieval.query": query, "tdn.retrieval.source": source,
                                                  "tdn.kb.snapshot": kb_snapshot}) as span:
         if span is not None:
             span.input_digest = _put_blob(state, query)
         served = _replayable(span, "retrieval", query)
         chunks = served[0] if served else fn(query)
+        if drop and not served:
+            chunks = _drop_chunks(chunks, drop)
+            if span is not None:
+                span.set("tdn.replay.dropped", drop)
         if span is not None:
             span.output_digest = _put_blob(state, chunks)
             span.set("tdn.retrieval.count", len(chunks))

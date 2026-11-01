@@ -65,7 +65,8 @@
         "tdn.handoff.to": {"type": "string"},
         "tdn.replay.of": {"type": "string", "description": "trace_id of the run this run replays."},
         "tdn.replay.mode": {"enum": ["exact", "from-step", "swap", "full"]},
-        "tdn.replay.source": {"enum": ["recorded", "live", "live-diverged"]}
+        "tdn.replay.source": {"enum": ["recorded", "live", "live-diverged", "stub"], "description": "Where a replayed step's result came from; stub = a stand-in tool passed for a fix check."},
+        "tdn.replay.dropped": {"type": "object", "description": "Retrieved chunks removed while testing a suggested fix: {stale, sources, ids, steps}."}
       },
       "additionalProperties": true
     }

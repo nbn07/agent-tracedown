@@ -1,5 +1,10 @@
 """Proven fixes: check that Tracedown blamed the right step, and that a fix works.
 
+    results = tdn.try_fixes(trace_id, agent=lambda: calendar_agent(),
+                            tools={"calendar_create_event": fake_create_event})
+    for r in results:
+        print(r["verdict"], r["change"])   # works / does_not_work / blocked / not_tried
+
     report = tdn.confirm_cause(trace_id, corrected='{"start": "2026-11-06T15:00:00-05:00"}',
                                agent=lambda: calendar_agent(),
                                tools={"calendar_create_event": fake_create_event})
@@ -83,6 +88,22 @@ def confirm_cause(trace_id: str, corrected: Union[str, Dict[str, Any], Callable[
         raise ValueError(f"step {step} is not a model step")
     overrides: Dict[str, Any] = {"llm_fn": _as_llm_fn(corrected), "steps": [step],
                                  "tools": dict(tools or {}), "live_tools": list(live_tools or [])}
+    results, blocked = _replay_and_check(base, key, trace_id, bundle, step, overrides, agent, test, tries)
+    if blocked:
+        return {"verdict": "blocked", "passed": False, "tries": results, "step": step, "summary": blocked}
+    ok = sum(1 for r in results if r.get("passed"))
+    passed = ok == len(results)
+    return {
+        "verdict": "cause_confirmed" if passed else "not_confirmed", "passed": passed, "step": step,
+        "summary": (f"Correcting step {step} fixed the run in {ok} of {len(results)} replays."
+                    if passed else f"Correcting step {step} fixed the run in only {ok} of {len(results)} "
+                    "replays, so it is not the whole cause."),
+        "tries": results,
+    }
+
+
+def _replay_and_check(base, key, trace_id, bundle, step, overrides, agent, test, tries):
+    """Replay ``tries`` times and check each replay. Returns (checks, blocked message or None)."""
     results: List[Dict[str, Any]] = []
     for _ in range(max(1, tries)):
         user_passed: Optional[bool] = None
@@ -91,8 +112,7 @@ def confirm_cause(trace_id: str, corrected: Union[str, Dict[str, Any], Callable[
             try:
                 value = agent()
             except tracer.SideEffectBlocked as exc:
-                return {"verdict": "blocked", "passed": False, "tries": results, "step": step,
-                        "summary": str(exc)}
+                return results, str(exc)
             except Exception:  # noqa: BLE001 - the replay's own analysis reports the error
                 value, user_passed = None, (False if test else None)
             else:
@@ -109,12 +129,43 @@ def confirm_cause(trace_id: str, corrected: Union[str, Dict[str, Any], Callable[
             q["user_test"] = str(user_passed).lower()
         results.append(_call(base, key, "GET",
                              f"/api/v1/runs/{trace_id}/fix-check?{urllib.parse.urlencode(q)}"))
-    ok = sum(1 for r in results if r.get("passed"))
-    passed = ok == len(results)
-    return {
-        "verdict": "cause_confirmed" if passed else "not_confirmed", "passed": passed, "step": step,
-        "summary": (f"Correcting step {step} fixed the run in {ok} of {len(results)} replays."
-                    if passed else f"Correcting step {step} fixed the run in only {ok} of {len(results)} "
-                    "replays, so it is not the whole cause."),
-        "tries": results,
-    }
+    return results, None
+
+
+def try_fixes(trace_id: str, agent: Callable[[], Any], *,
+              tools: Optional[Dict[str, Callable[..., Any]]] = None,
+              live_tools: Optional[List[str]] = None,
+              test: Optional[Callable[[Any], bool]] = None, tries: int = 3,
+              endpoint: Optional[str] = None, api_key: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Try each fix Tracedown suggests for ``trace_id`` and check whether it works.
+
+    A suggestion Tracedown can try without touching your code (an instruction added to a
+    prompt, an outdated or injected document left out) is replayed ``tries`` times; it
+    ``works`` only if every replay passes the fix check. Other suggestions come back as
+    ``not_tried``, with what to change. Returns the suggestions, most likely first, each with
+    ``verdict``: works, does_not_work, blocked or not_tried.
+    """
+    base, key = _endpoint(endpoint, api_key)
+    suggestions = _call(base, key, "GET", f"/api/v1/runs/{trace_id}/suggestions")["suggestions"]
+    bundle = None
+    out = []
+    for s in suggestions:
+        attempt = s.get("try")
+        if not attempt:
+            out.append({**s, "verdict": "not_tried", "checks": [],
+                        "summary": s.get("why_not_tried") or "Tracedown cannot try this one for you."})
+            continue
+        bundle = bundle or tracer.fetch_bundle(base, trace_id, key)
+        overrides = {**attempt["overrides"], "tools": dict(tools or {}), "live_tools": list(live_tools or [])}
+        results, blocked = _replay_and_check(base, key, trace_id, bundle, attempt["from_step"], overrides,
+                                             agent, test, tries)
+        if blocked:
+            out.append({**s, "verdict": "blocked", "checks": results, "summary": blocked})
+            continue
+        ok = sum(1 for r in results if r.get("passed"))
+        works = ok == len(results)
+        reasons = next((r["reasons"] for r in results if not r.get("passed")), results[-1]["reasons"])
+        out.append({**s, "verdict": "works" if works else "does_not_work", "checks": results,
+                    "summary": f"{'Works' if works else 'Did not work'}: {ok} of {len(results)} replays passed "
+                               f"({'; '.join(reasons)})."})
+    return out

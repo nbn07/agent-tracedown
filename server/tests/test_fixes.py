@@ -161,3 +161,81 @@ def test_confirm_cause_runs_the_users_test(server):
     r = tdn.confirm_cause(tid, corrected=FIXED, agent=demo.calendar_agent, tools=STUB, tries=1,
                           test=lambda trace_id: False)
     assert r["verdict"] == "not_confirmed" and "your test failed" in r["tries"][0]["reasons"]
+
+
+# ----------------------------------------------------------------------------- part 2: suggested fixes
+
+def _suggestions(url, tid):
+    import urllib.request
+    with urllib.request.urlopen(f"{url}/api/v1/runs/{tid}/suggestions") as r:
+        return json.loads(r.read())["suggestions"]
+
+
+AGENTS = {"refund": "SupportBot", "pricing": "SalesAssistant", "injection": "ProductResearcher",
+          "loop": "ResearchAssistant", "order_status": "OrderStatusAgent"}
+
+
+def _failed(url, story):
+    """Run a demo story and return its trace id (some stories end 'successfully' but wrong)."""
+    try:
+        demo.ALL[story]()
+    except Exception:  # noqa: BLE001 - the demo runs fail on purpose
+        pass
+    import urllib.request
+    with urllib.request.urlopen(f"{url}/api/v1/runs?agent={AGENTS[story]}&limit=1") as r:
+        return json.loads(r.read())["runs"][0]["trace_id"]
+
+
+def test_suggestion_for_a_bad_date_is_a_prompt_instruction(server):
+    tid = _bad_run(server)
+    [s] = _suggestions(server, tid)
+    assert s["category"] == "bad_llm_output" and s["step"] == 4
+    assert "ISO-8601" in s["try"]["overrides"]["prompt_note"] and s["try"]["from_step"] == 4
+    assert "calendar_create_event" in s["change"]
+
+
+def test_try_fixes_proves_the_date_instruction_works(server):
+    tid = _bad_run(server)
+    [r] = tdn.try_fixes(tid, agent=demo.calendar_agent, tools=STUB)
+    assert r["verdict"] == "works" and len(r["checks"]) == 3, r["summary"]
+
+
+def test_try_fixes_leaves_out_the_outdated_policy(server):
+    tid = _failed(server, "refund")
+    [r] = tdn.try_fixes(tid, agent=demo.refund_agent, tries=1)
+    assert r["category"] == "stale_source" and r["verdict"] == "works", r["summary"]
+    assert "outdated" in r["tries_as"]
+
+
+def test_try_fixes_grounds_a_made_up_price(server):
+    tid = _failed(server, "pricing")
+    [r] = tdn.try_fixes(tid, agent=demo.pricing_agent, tries=1, tools={"get_price": lambda plan: {
+        "plan": "pro", "usd_per_month": 39}})
+    assert r["category"] == "hallucination" and r["verdict"] == "works", r["summary"]
+
+
+def test_try_fixes_drops_the_page_with_hidden_instructions(server):
+    tid = _failed(server, "injection")
+    [r] = tdn.try_fixes(tid, agent=demo.injection_agent, tries=1)
+    assert r["category"] == "prompt_injection" and r["verdict"] == "works", r["summary"]
+
+
+def test_without_the_fix_the_replay_stops_before_sending_email(server):
+    tid = _failed(server, "injection")
+    bundle = tdn.fetch_bundle(server, tid)
+    with pytest.raises(tdn.SideEffectBlocked):
+        with tdn.replay(bundle, mode="from-step", from_step=2, overrides={"live_tools": []}):
+            demo.injection_agent()
+
+
+def test_a_fix_that_fails_the_users_test_does_not_work(server):
+    tid = _bad_run(server)
+    [r] = tdn.try_fixes(tid, agent=demo.calendar_agent, tools=STUB, tries=1, test=lambda value: False)
+    assert r["verdict"] == "does_not_work" and "your test failed" in r["summary"]
+
+
+def test_code_changes_and_user_mistakes_are_not_tried(server):
+    loop = tdn.try_fixes(_failed(server, "loop"), agent=demo.research_loop_agent)
+    assert [r["verdict"] for r in loop] == ["not_tried"] and "stop condition" in loop[0]["change"]
+    user = tdn.try_fixes(_failed(server, "order_status"), agent=demo.ALL["order_status"])
+    assert user[0]["verdict"] == "not_tried" and "not the agent's mistake" in user[0]["change"]

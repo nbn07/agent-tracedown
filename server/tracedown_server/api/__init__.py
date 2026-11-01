@@ -359,6 +359,14 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
             raise HTTPException(400, f"run {replay} is a replay of another run")
         return {"original": trace_id, "replay": replay, **fixes.check(original, rep, user_test)}
 
+    @api.get("/runs/{trace_id}/suggestions", tags=["replay"])
+    def suggestions(trace_id: str, p: Principal = Depends(principal)) -> Dict[str, Any]:
+        """Suggested fixes, and for those Tracedown can try itself, the replay recipe."""
+        from .. import fixes
+        spans = spans_for(p, trace_id)
+        report = store.get_findings(trace_id) or analysis(trace_id, spans)
+        return {"trace_id": trace_id, "suggestions": fixes.suggest(report, spans, blobs_for(spans))}
+
     @api.get("/runs/{trace_id}/graph", tags=["visualization"])
     def get_graph(trace_id: str, p: Principal = Depends(principal)) -> Dict[str, Any]:
         return build_graph(spans_for(p, trace_id))

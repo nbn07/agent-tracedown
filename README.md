@@ -246,7 +246,7 @@ helm install tracedown deploy/helm/tracedown
 
 ## Roadmap
 
-- **Proven fixes** (in progress for v0.5): suggest a fix, replay the run with it, and show that it now passes. Done so far: the check that decides whether a replay fixed the run, and `tdn.confirm_cause()`
+- **Proven fixes** (in progress for v0.5): suggest a fix, replay the run with it, and show that it now passes. Done so far: the check that decides whether a replay fixed the run, `tdn.confirm_cause()`, and suggested fixes that `tdn.try_fixes()` tests for you
 - **MCP server**, to ask "why did run X fail?" from Claude Code, Cursor or any MCP client
 - **GitHub Action** that runs your agent's test conversations on every pull request
 - **Write-back to Langfuse and Phoenix**, so the verdict appears in the tool you already use
