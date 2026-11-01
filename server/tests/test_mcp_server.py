@@ -169,6 +169,16 @@ def test_explain_run_falls_back_when_the_key_may_not_analyse(demo):
     assert "has not been analysed" in text
 
 
+def _attr(obj, *names):
+    """mcp 2.x uses snake_case attribute names, 1.x camelCase."""
+    for n in names:
+        try:
+            return getattr(obj, n)
+        except AttributeError:
+            continue
+    raise AttributeError(names)
+
+
 def test_a_real_mcp_session_over_stdio(demo):
     from mcp import ClientSession, StdioServerParameters
     from mcp.client.stdio import stdio_client
@@ -189,10 +199,10 @@ def test_a_real_mcp_session_over_stdio(demo):
                 return info, tools, result.content[0].text, missing, listed
 
     info, tools, text, missing, listed = asyncio.run(session())
-    assert missing.isError and "404" in missing.content[0].text  # an error, and a sentence
-    hints = {t.name: t.annotations.readOnlyHint for t in listed}
+    assert _attr(missing, "is_error", "isError") and "404" in missing.content[0].text  # an error, and a sentence
+    hints = {t.name: _attr(t.annotations, "read_only_hint", "readOnlyHint") for t in listed}
     assert hints["explain_run"] is True and hints["diagnose_trace"] is False
-    assert info.serverInfo.name == "tracedown"
+    assert _attr(info, "server_info", "serverInfo").name == "tracedown"
     assert tools == sorted(["list_failed_runs", "explain_run", "get_step", "suggest_fixes", "check_replay",
                             "check_claims", "list_incidents", "diagnose_trace"])
     assert "Outdated retrieval source at step 2" in text
@@ -203,3 +213,12 @@ def test_a_missing_key_says_how_to_set_it():
     with pytest.raises(m.TracedownError, match=r"authentication required\. Set TDN_API_KEY"):
         m.list_failed_runs(m.Client(f"http://127.0.0.1:{srv.server_address[1]}"))
     srv.shutdown()
+
+
+def test_the_api_key_follows_a_redirect_on_the_same_host():
+    target, seen = _stub(b'{"runs": []}')
+    port = target.server_address[1]
+    redirect, first = _stub(b"", status=307, headers=[("Location", "http://127.0.0.1:%d/api/v1/runs" % port)])
+    m.list_failed_runs(m.Client(f"http://127.0.0.1:{redirect.server_address[1]}", api_key="tdn_secret"))
+    assert seen[0][1] == "Bearer tdn_secret"  # same host (a proxy, say): the key goes along
+    target.shutdown(); redirect.shutdown()

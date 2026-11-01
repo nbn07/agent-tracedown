@@ -55,6 +55,23 @@ def check_endpoint(endpoint: str) -> str:
     return endpoint.rstrip("/")
 
 
+class _KeepKeyOnSameHost(urllib.request.HTTPRedirectHandler):
+    """Follow redirects, but send the API key only to the same host and never from https to http
+    (a proxy upgrading http to https keeps working; an identity provider elsewhere gets no key)."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        new = super().redirect_request(req, fp, code, msg, headers, newurl)
+        key = req.unredirected_hdrs.get("Authorization")
+        if new is not None and key:
+            old_u, new_u = urllib.parse.urlparse(req.full_url), urllib.parse.urlparse(newurl)
+            if old_u.hostname == new_u.hostname and not (old_u.scheme == "https" and new_u.scheme == "http"):
+                new.add_unredirected_header("Authorization", key)
+        return new
+
+
+_OPENER = urllib.request.build_opener(_KeepKeyOnSameHost)
+
+
 class Client:
     """The few HTTP calls the tools need. Every failure becomes a TracedownError with a plain sentence."""
 
@@ -72,7 +89,7 @@ class Client:
         if body is not None:
             req.add_header("Content-Type", "application/json")
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as r:
+            with _OPENER.open(req, timeout=self.timeout) as r:
                 data = r.read().decode("utf-8", errors="replace")
         except urllib.error.HTTPError as e:
             detail = e.read().decode("utf-8", errors="replace")
@@ -140,7 +157,7 @@ def explain_run(c: Client, trace_id: str) -> str:
         except TracedownError as e:
             if "403" not in str(e):
                 raise
-            report = {}  # a key that may not run analysis: fall back to the stored stack trace below
+            report = {}  # a key that may not run analysis: say so below
     out = [f"Run {trace_id}: {run.get('agent_name')}, outcome {run.get('outcome')}, "
            f"{_plural(run.get('span_count') or 0, 'step')}."]
     if run.get("replay_of"):
