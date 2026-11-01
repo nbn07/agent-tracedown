@@ -48,6 +48,7 @@ markdown_extensions:
 nav:
   - Home: index.md
   - Quick start: quickstart.md
+  - FAQ: faq.md
   - Diagnose runs you already have: importing.md
   - Integrations: integrations.md
   - How Tracedown decides: HOW-IT-DECIDES.md
