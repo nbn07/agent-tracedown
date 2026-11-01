@@ -1,6 +1,6 @@
 # Tracedown wiki
 
-**Tracedown finds the step that caused your AI agent's failure.** Your tracing tool shows what the agent did. Tracedown tells you which step broke it, shows the evidence, and replays the run with your fix. It is open source (Apache-2.0), and every feature is free.
+**Tracedown finds the step that caused your AI agent's failure.** Your tracing tool shows what the agent did. Tracedown tells you which step broke it, shows the evidence, suggests a fix and proves whether it works. It is open source (Apache-2.0), and every feature is free.
 
 Think of a car mechanic. The warning light on the dashboard is the *symptom*. A good mechanic doesn't replace the light; they follow the wires back to the part that failed. Tracedown does the same with an agent run: it starts where the failure showed up and follows the data back to the step that caused it.
 

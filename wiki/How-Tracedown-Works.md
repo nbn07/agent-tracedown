@@ -64,7 +64,7 @@ sequenceDiagram
 
 Replay needs a run recorded with the Python or TypeScript SDK, because it runs inside your code. Runs imported from Langfuse or OpenTelemetry get the full diagnosis but can't be replayed on their own.
 
-**Coming in v0.5 ([Roadmap](Roadmap)):** after a replay, Tracedown checks whether the fix worked: the blamed problem is gone, nothing new broke, the run finished, and your own test passed. `tdn.confirm_cause()` uses the same check to prove the blamed step really was the cause.
+**Proven fixes (v0.5):** Tracedown also suggests fixes and tests them: it replays the run with each fix three times and checks that the blamed problem is gone, nothing new broke, the run finished, and your own test passed. The **Fixes** tab on a failed run shows the result; `tdn.try_fixes()` runs them on your agent.
 
 ## Where it goes wrong
 

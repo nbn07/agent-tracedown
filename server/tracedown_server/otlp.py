@@ -48,7 +48,7 @@ def to_otlp_json(spans: List[Dict[str, Any]], service_name: str = "agent") -> Di
         })
     return {"resourceSpans": [{
         "resource": {"attributes": [attr("service.name", service_name)]},
-        "scopeSpans": [{"scope": {"name": "agent-tracedown", "version": "0.4.3"}, "spans": otlp_spans}],
+        "scopeSpans": [{"scope": {"name": "agent-tracedown", "version": "0.5.0"}, "spans": otlp_spans}],
     }]}
 
 

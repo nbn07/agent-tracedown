@@ -12,7 +12,7 @@ What's done, what's being built, and what's next. Requests with a real failing r
 | 0.4.2 | Tidier read-only [public demo](https://tracedown-demo.onrender.com/runs/) |
 | 0.4.3 | "Top suspect" instead of confidence numbers, after measuring that scores don't predict correctness; Sonnet judge results published |
 
-## In progress: v0.5 "Proven fixes"
+## v0.5.0 "Proven fixes" (released)
 
 Like a mechanic who swaps the part and takes the car for a test drive.
 
@@ -24,7 +24,7 @@ Like a mechanic who swaps the part and takes the car for a test drive.
 - [x] **In the web app:** a Fixes tab on each failed run (suggestions, whether each one worked, and the code to try them), and "Did this replay fix the run?" on every replay
 - [ ] TypeScript SDK support (planned for v0.6)
 
-Work happens on the [`proven-fixes`](https://github.com/nbn07/agent-tracedown/tree/proven-fixes) branch.
+Still to come: LLM-worded suggestions when a judge is on, and the TypeScript SDK (v0.6).
 
 ## Next
 
