@@ -22,6 +22,7 @@ def main() -> None:
                    help="server processes; more than 1 needs --database-url and --redis-url")
     args = p.parse_args()
     os.environ["TDN_DB"] = args.db
+    os.environ["TDN_BIND_HOST"] = args.host  # on localhost, an open server answers only to local names
     if args.database_url:
         os.environ["TDN_DATABASE_URL"] = args.database_url
     if args.redis_url:

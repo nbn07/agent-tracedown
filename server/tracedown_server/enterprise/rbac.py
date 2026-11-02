@@ -150,6 +150,19 @@ class Sessions:
 
 # ----------------------------------------------------------------------------- directory
 
+def _resets_open_mode(fn):
+    """After a method that adds or removes keys or users, ask the database again."""
+    import functools
+
+    @functools.wraps(fn)
+    def wrapper(self, *args, **kwargs):
+        try:
+            return fn(self, *args, **kwargs)
+        finally:
+            self._open_cache = None
+    return wrapper
+
+
 class Directory:
     def __init__(self, store, static_keys: Optional[List[str]] = None, sessions: Optional[Sessions] = None,
                  require_auth: Optional[bool] = None) -> None:
@@ -163,13 +176,24 @@ class Directory:
 
     # -------------------------------------------------------------- mode
     def open_mode(self) -> bool:
+        """No keys and no users: anyone who can reach the server is let in. Asked on every request,
+        so the answer is kept for a second (and dropped at once when this process adds a key or user)."""
         if self.require_auth or self.static:
             return False
+        now = time.monotonic()
+        cached = getattr(self, "_open_cache", None)
+        if cached and cached[1] > now:
+            return cached[0]
         has = self.store.query("SELECT (SELECT COUNT(*) FROM users) u, "
                                "(SELECT COUNT(*) FROM api_keys WHERE revoked_at IS NULL) k")[0]
-        return has["u"] == 0 and has["k"] == 0
+        value = has["u"] == 0 and has["k"] == 0
+        self._open_cache = (value, now + 1.0)
+        return value
+
+
 
     # -------------------------------------------------------------- users
+    @_resets_open_mode
     def upsert_user(self, email: str, name: Optional[str] = None, org_role: Optional[str] = None,
                     sso_subject: Optional[str] = None) -> Dict[str, Any]:
         email = email.lower()
@@ -213,6 +237,7 @@ class Directory:
         return Principal(f"user:{user['id']}", "user", user["email"], user["org_role"], roles)
 
     # -------------------------------------------------------------- keys
+    @_resets_open_mode
     def create_key(self, project: str, role: str, name: Optional[str] = None, created_by: str = "system") -> Dict[str, Any]:
         if role not in ROLES:
             raise ValueError(f"role must be one of {sorted(ROLES)}")
@@ -227,6 +252,7 @@ class Directory:
         q = "SELECT id, name, prefix, project, role, created_by, created_at, last_used_at, revoked_at FROM api_keys"
         return self.store.query(q + (" WHERE project=?" if project else ""), (project,) if project else ())
 
+    @_resets_open_mode
     def revoke_key(self, key_id: int) -> None:
         self.store.execute("UPDATE api_keys SET revoked_at=? WHERE id=?", (time.time_ns(), key_id))
 

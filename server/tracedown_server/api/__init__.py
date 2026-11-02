@@ -13,15 +13,22 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import sqlite3
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request, Response
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from fastapi import Path as PathParam
+from fastapi.responses import (
+    FileResponse,
+    JSONResponse,
+    PlainTextResponse,
+    RedirectResponse,
+    StreamingResponse,
+)
+from pydantic import BaseModel, Field, field_validator
 
 from .. import __version__, analytics, drift, incidents, pricing
 from ..cache import RateLimiter, cache_from_env, wrap_store
@@ -31,8 +38,8 @@ from ..enterprise.audit import AuditLog
 from ..enterprise.pii import PolicyEngine
 from ..enterprise.rbac import Directory, Principal
 from ..enterprise.sso import OIDC, SSOError
-from ..incidents import hooks
 from ..importers import UnknownFormat, import_any, import_otlp, parse_text
+from ..incidents import hooks
 from ..pipeline import Pipeline
 from ..rca import RunView, analyze
 from ..replay import MODES, diff, plan
@@ -40,15 +47,22 @@ from ..storage import SQLiteStore, TraceOwnershipError
 from .views import build_graph, build_tree, merge_graphs
 
 log = logging.getLogger("tracedown")
-STATIC = Path(__file__).resolve().parent.parent / "static"
 # The full web app, exported as static files (web/scripts/build-static.mjs) and shipped in the
 # wheel. TDN_WEB_DIR points elsewhere; an empty value turns it off.
 WEB = Path(os.environ.get("TDN_WEB_DIR", "") or Path(__file__).resolve().parent.parent / "web")
+LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+_HOST_HEADER = re.compile(r"^(?:\[([0-9a-f:.]+)\]|([a-z0-9.-]+))(?::\d{1,5})?$")
+# The only writes a read-only server accepts: re-running the analysis of a run, and planning a replay.
+_READ_ONLY_ALLOWED = re.compile(r"^/api/v1/runs/[^/]+/(analyze|replay)$")
+NO_WEB_APP = ("Tracedown is running, but this copy has no web app built in. The API is at /api/v1 "
+              "(documented at /docs).\n\nPackages from PyPI include the web app. In a source checkout, "
+              "build it once with:  node web/scripts/build-static.mjs\nor run it separately: "
+              "cd web && npm install && npm run dev\n")
 READ_ONLY_MESSAGE = ("This is a read-only demo. To diagnose your own runs, install Tracedown: "
                      "pip install agent-tracedown-server && tracedown up")
 IMPORT_LIMIT = int(os.environ.get("TDN_IMPORT_LIMIT_KB", "5120")) * 1024  # pasted exports
 IMPORT_MAX_RUNS = 50
-_API_PREFIXES = ("api/", "v1/", "auth/", "healthz", "metrics", "docs", "redoc", "openapi.json", "static/")
+_API_PREFIXES = ("api/", "v1/", "auth/", "healthz", "metrics", "docs", "redoc", "openapi.json")
 _DETAIL_ROUTES = ("runs", "incidents")  # one prerendered page each, at <route>/_/
 
 
@@ -75,23 +89,39 @@ def web_available() -> bool:
 
 # ----------------------------------------------------------------------------- request models
 
+INT64 = 2 ** 63 - 1
+MAX_SPANS_PER_REQUEST = int(os.environ.get("TDN_MAX_SPANS_PER_REQUEST", "10000"))
+MAX_BODY_BYTES = int(float(os.environ.get("TDN_MAX_BODY_MB", "20")) * 1024 * 1024)
+DbId = Annotated[int, PathParam(ge=0, le=INT64)]
+_INT_ATTRS = ("tdn.step", "gen_ai.usage.input_tokens", "gen_ai.usage.output_tokens")
+
+
 class SpanIn(BaseModel):
-    trace_id: str
-    span_id: str
-    parent_span_id: Optional[str] = None
-    name: str
-    kind: str
-    start_time: int
-    end_time: Optional[int] = None
+    trace_id: str = Field(min_length=1, max_length=128)
+    span_id: str = Field(min_length=1, max_length=128)
+    parent_span_id: Optional[str] = Field(None, max_length=128)
+    name: str = Field(max_length=1000)
+    kind: str = Field(max_length=32)
+    start_time: int = Field(ge=0, le=INT64)
+    end_time: Optional[int] = Field(None, ge=0, le=INT64)
     status: Dict[str, Any] = Field(default_factory=lambda: {"code": "UNSET", "message": ""})
     attributes: Dict[str, Any] = Field(default_factory=dict)
-    input_digest: Optional[str] = None
-    output_digest: Optional[str] = None
+    input_digest: Optional[str] = Field(None, max_length=200)
+    output_digest: Optional[str] = Field(None, max_length=200)
+
+    @field_validator("attributes")
+    @classmethod
+    def _numbers_are_numbers(cls, v: Dict[str, Any]) -> Dict[str, Any]:
+        for k in _INT_ATTRS:
+            x = v.get(k)
+            if x is not None and (isinstance(x, bool) or not isinstance(x, int) or not 0 <= x <= INT64):
+                raise ValueError(f"{k} must be a whole number between 0 and 2^63-1")
+        return v
 
 
 class SpanBatch(BaseModel):
-    project: str = "default"
-    spans: List[SpanIn]
+    project: str = Field("default", min_length=1, max_length=200)
+    spans: List[SpanIn] = Field(max_length=MAX_SPANS_PER_REQUEST)
 
 
 class BlobBatch(BaseModel):
@@ -177,6 +207,15 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
                 "`tracedown up --db ~/.tracedown/tracedown.db`. Otherwise check the file's permissions.")})
         return JSONResponse(status_code=500, content={"detail": f"database error: {exc}"})
 
+    @app.exception_handler(UnicodeEncodeError)
+    @app.exception_handler(OverflowError)
+    @app.exception_handler(RecursionError)
+    async def bad_input(request: Request, exc: Exception):
+        reason = {"UnicodeEncodeError": "text that is not valid Unicode (an unpaired surrogate)",
+                  "OverflowError": "a number too large to store",
+                  "RecursionError": "data nested too deeply"}[type(exc).__name__]
+        return JSONResponse(status_code=422, content={"detail": f"The request contains {reason}."})
+
     @app.exception_handler(Exception)
     async def unexpected_error(request: Request, exc: Exception):
         log.exception("unexpected error on %s %s", request.method, request.url.path)
@@ -204,23 +243,91 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
     # write. `tracedown up --read-only` switches it on after loading the demo runs.
     app.state.read_only = os.environ.get("TDN_READ_ONLY") == "1"
 
+    # While `tracedown up --read-only` loads its demo runs, only the loader (which knows this token)
+    # gets in; everyone else waits for read-only mode, so nothing can be written in between.
+    app.state.loading_token = None
+
     @app.middleware("http")
     async def read_only_guard(request: Request, call_next):
-        if app.state.read_only and request.method not in ("GET", "HEAD", "OPTIONS") \
-                and not request.url.path.endswith(("/analyze", "/replay")):
-            return JSONResponse({"detail": READ_ONLY_MESSAGE}, status_code=403)
+        path = request.url.path
+        token = app.state.loading_token
+        if token is not None and path != "/healthz" \
+                and request.headers.get("authorization") != f"Bearer {token}":
+            return JSONResponse({"detail": "Tracedown is starting up. Try again in a few seconds."},
+                                status_code=503, headers={"Retry-After": "5"})
+        if app.state.read_only:
+            if path.startswith("/api/v1/admin/"):
+                return JSONResponse({"detail": READ_ONLY_MESSAGE}, status_code=403)
+            if request.method not in ("GET", "HEAD", "OPTIONS") and not _READ_ONLY_ALLOWED.match(path):
+                return JSONResponse({"detail": READ_ONLY_MESSAGE}, status_code=403)
         return await call_next(request)
 
     @app.middleware("http")
     async def audit_mutations(request: Request, call_next):
         response = await call_next(request)
         path = request.url.path
+        if app.state.read_only:
+            return response  # nothing is written, and refused attempts must not fill the database
         if request.method in ("POST", "PUT", "PATCH", "DELETE") and (path.startswith("/api/") or path.startswith("/auth/")):
             p = getattr(request.state, "principal", None)
             audit.append(actor(p) if p else "unauthenticated", f"{request.method} {path}",
                          ip=request.client.host if request.client else None,
                          outcome="ok" if response.status_code < 400 else f"http_{response.status_code}")
         return response
+
+    @app.middleware("http")
+    async def body_limit(request: Request, call_next):
+        """Refuse request bodies over TDN_MAX_BODY_MB (default 20 MB); /import has its own 5 MB limit."""
+        if request.method in ("POST", "PUT", "PATCH"):
+            size = request.headers.get("content-length")
+            if size is not None and size.isdigit() and int(size) > MAX_BODY_BYTES:
+                return JSONResponse({"detail": f"request body too large: {int(size) // 1024 // 1024} MB, the limit is "
+                                               f"{MAX_BODY_BYTES // 1024 // 1024} MB (TDN_MAX_BODY_MB)"},
+                                    status_code=413)
+            if size is None:  # chunked: count as it arrives
+                receive, seen = request._receive, [0]
+
+                async def counted():
+                    msg = await receive()
+                    seen[0] += len(msg.get("body", b""))
+                    if seen[0] > MAX_BODY_BYTES:
+                        raise HTTPException(413, "request body too large")
+                    return msg
+                request._receive = counted
+        return await call_next(request)
+
+    # Open mode (no keys, no users) trusts whoever can reach the server. Two checks keep that to
+    # the machine itself: a browser page from another site cannot send writes (Origin must match
+    # Host), and when the server listens on localhost only, requests must name a local host, which
+    # stops DNS rebinding. TDN_ALLOWED_HOSTS adds names (comma-separated); "*" turns the host check off.
+    # TDN_BIND_HOST is set by `tracedown up` and `tracedown-server` to the address they listen on.
+    app.state.allowed_hosts = LOCAL_HOSTS if os.environ.get("TDN_BIND_HOST", "") in LOCAL_HOSTS else None
+
+    def _hostname(value: str) -> Optional[str]:
+        """The host part of a Host header, or None when it is not a plain host[:port]."""
+        m = _HOST_HEADER.match(value.strip().lower())
+        return (m.group(1) or m.group(2)) if m else None
+
+    @app.middleware("http")
+    async def open_mode_guard(request: Request, call_next):
+        if not directory.open_mode():
+            return await call_next(request)
+        host = request.headers.get("host", "")
+        allowed = app.state.allowed_hosts
+        extra = {h.strip().lower() for h in os.environ.get("TDN_ALLOWED_HOSTS", "").split(",") if h.strip()}
+        if allowed is not None and "*" not in extra and _hostname(host) not in (set(allowed) | extra):  # None too
+            return JSONResponse({"detail": f"Host {host!r} is not allowed. Open this server as localhost, or add "
+                                           "the name to TDN_ALLOWED_HOSTS."}, status_code=421)
+        origin = request.headers.get("origin")
+        if origin and request.method not in ("GET", "HEAD", "OPTIONS"):
+            from urllib.parse import urlparse
+            o = urlparse(origin)
+            same = (o.netloc or "").lower() == host.lower()
+            both_local = (o.hostname or "") in LOCAL_HOSTS and _hostname(host) in LOCAL_HOSTS  # `npm run dev`
+            if origin == "null" or not (same or both_local):
+                return JSONResponse({"detail": "Cross-site request refused: this server has no login, so it only "
+                                               "accepts changes from its own pages."}, status_code=403)
+        return await call_next(request)
 
     def visible(p: Principal, project: Optional[str]) -> bool:
         allowed = p.projects()
@@ -296,8 +403,8 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
             return {"accepted": accepted}
         except TraceOwnershipError as exc:
             raise HTTPException(409, str(exc)) from exc
-        except ValueError as exc:
-            raise HTTPException(422, str(exc)) from exc
+        except (ValueError, KeyError, TypeError, AttributeError) as exc:
+            raise HTTPException(422, f"not a valid OTLP/JSON export: {exc}") from exc
 
     # -------------------------------------------------------------- runs
     @api.get("/facets", tags=["runs"])
@@ -311,7 +418,7 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
 
     @api.get("/runs", tags=["runs"])
     def list_runs(project: Optional[str] = None, agent: Optional[str] = None, outcome: Optional[str] = None,
-                  limit: int = Query(50, le=500), offset: int = 0, p: Principal = Depends(principal)) -> Dict[str, Any]:
+                  limit: int = Query(50, ge=1, le=500), offset: int = Query(0, ge=0, le=INT64), p: Principal = Depends(principal)) -> Dict[str, Any]:
         need(p, "runs:read", project)
         runs = [r for r in store.list_runs(project, agent, outcome, limit, offset) if visible(p, r["project"])]
         prices = analytics.get_prices(store)
@@ -342,8 +449,9 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
     def get_bundle(trace_id: str, request: Request, p: Principal = Depends(principal)) -> Dict[str, Any]:
         """Everything the SDK needs to replay the run (includes payload content)."""
         spans = spans_for(p, trace_id, "payloads:read")
-        audit.append(actor(p), "read payloads (bundle)", trace_id, run_project(trace_id),
-                     request.client.host if request.client else None)
+        if not app.state.read_only:  # a public demo must not grow its database on every read
+            audit.append(actor(p), "read payloads (bundle)", trace_id, run_project(trace_id),
+                         request.client.host if request.client else None)
         return {"spans": spans, "blobs": blobs_for(spans)}
 
     @api.get("/runs/{trace_id}/fix-check", tags=["replay"])
@@ -393,8 +501,8 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
             raise HTTPException(413, f"export too large: {len(raw) // 1024} KB, the limit is {IMPORT_LIMIT // 1024} KB")
         try:
             fmt, runs = import_any(parse_text(raw.decode("utf-8", errors="replace")), format)
-        except (UnknownFormat, KeyError, TypeError, IndexError) as exc:
-            raise HTTPException(422, f"could not read this export: {exc}") from exc
+        except (UnknownFormat, KeyError, TypeError, IndexError, AttributeError, RecursionError) as exc:
+            raise HTTPException(422, f"could not read this export: {str(exc)[:300]}") from exc
         if not runs:
             raise HTTPException(422, "the export holds no runs")
         out = []
@@ -472,7 +580,8 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
         found = store.get_blobs([digest], project)
         if digest not in found:
             raise HTTPException(404, "blob not found")
-        audit.append(actor(p), "read payload", digest, project, request.client.host if request.client else None)
+        if not app.state.read_only:
+            audit.append(actor(p), "read payload", digest, project, request.client.host if request.client else None)
         try:
             return {"digest": digest, "content": json.loads(found[digest])}
         except ValueError:
@@ -480,7 +589,7 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
 
     # -------------------------------------------------------------- multi-agent visualization
     @api.get("/agents/{agent}/graph", tags=["visualization"])
-    def agent_network(agent: str, project: Optional[str] = None, limit: int = Query(200, le=2000),
+    def agent_network(agent: str, project: Optional[str] = None, limit: int = Query(200, ge=1, le=2000),
                       p: Principal = Depends(principal)) -> Dict[str, Any]:
         """The agent network across recent runs: call counts, error rates, handoffs."""
         need(p, "runs:read", project)
@@ -605,11 +714,11 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
         return inc
 
     @api.get("/incidents/{incident_id}", tags=["incidents"])
-    def get_incident(incident_id: int, p: Principal = Depends(principal)) -> Dict[str, Any]:
+    def get_incident(incident_id: DbId, p: Principal = Depends(principal)) -> Dict[str, Any]:
         return incident_or_404(p, incident_id, "incidents:read")
 
     @api.post("/incidents/{incident_id}/status", tags=["incidents"])
-    def incident_status(incident_id: int, body: StatusChange, p: Principal = Depends(principal)) -> Dict[str, Any]:
+    def incident_status(incident_id: DbId, body: StatusChange, p: Principal = Depends(principal)) -> Dict[str, Any]:
         incident_or_404(p, incident_id, "incidents:write")
         try:
             return incidents.set_status(store, incident_id, body.status, actor(p))
@@ -634,7 +743,7 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
             raise HTTPException(422, str(exc)) from exc
 
     @api.delete("/hooks/{hook_id}", tags=["incidents"])
-    def delete_hook(hook_id: int, p: Principal = Depends(principal)) -> Dict[str, Any]:
+    def delete_hook(hook_id: DbId, p: Principal = Depends(principal)) -> Dict[str, Any]:
         h = hooks.get(store, hook_id)
         if h is None:
             raise HTTPException(404, "hook not found")
@@ -643,7 +752,7 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
         return {"deleted": hook_id}
 
     @api.post("/hooks/{hook_id}/test", tags=["incidents"])
-    def test_hook(hook_id: int, p: Principal = Depends(principal)) -> Dict[str, Any]:
+    def test_hook(hook_id: DbId, p: Principal = Depends(principal)) -> Dict[str, Any]:
         h = hooks.get(store, hook_id)
         if h is None:
             raise HTTPException(404, "hook not found")
@@ -678,7 +787,7 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
         return {"users": directory.list_users()}
 
     @api.put("/admin/users/{user_id}/roles", tags=["admin"])
-    def set_roles(user_id: int, body: RolesIn, p: Principal = Depends(principal)) -> Dict[str, Any]:
+    def set_roles(user_id: DbId, body: RolesIn, p: Principal = Depends(principal)) -> Dict[str, Any]:
         need(p, "users:manage")
         try:
             for project, role in body.roles.items():
@@ -695,10 +804,27 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
         need(p, "users:manage")
         if "@" not in str(body.get("email", "")):
             raise HTTPException(422, "email required")
+        if directory.open_mode():
+            raise HTTPException(409, "This server has no login yet (open mode). Adding a user here would lock "
+                                     "everyone out until SSO is set up. Set up SSO (TDN_OIDC_ISSUER) or start the "
+                                     "server with TDN_API_KEYS first.")
+        roles = body.get("roles") or {}
+        if not isinstance(roles, dict):
+            raise HTTPException(422, "roles must be an object of project: role")
+        from ..enterprise.rbac import ROLES
+        bad = {r for r in roles.values() if r is not None and r not in ROLES}
+        if bad or body.get("org_role", "member") not in ("owner", "member"):
+            raise HTTPException(422, f"unknown role(s) {sorted(map(str, bad)) or body.get('org_role')}")
         u = directory.upsert_user(body["email"], body.get("name"), body.get("org_role", "member"))
-        for project, role in (body.get("roles") or {}).items():
+        for project, role in roles.items():
             directory.set_membership(u["id"], project, role)
         return u
+
+    def no_lockout() -> None:
+        if directory.open_mode():
+            raise HTTPException(409, "This server has no login yet (open mode). Creating the first key or user here "
+                                     "would lock everyone else out. Start the server with an owner key instead, "
+                                     "e.g. TDN_API_KEYS=<a long secret> (or set up SSO), then create keys with it.")
 
     @api.get("/admin/keys", tags=["admin"])
     def list_keys(project: Optional[str] = None, p: Principal = Depends(principal)) -> Dict[str, Any]:
@@ -708,13 +834,14 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
     @api.post("/admin/keys", tags=["admin"])
     def create_key(body: KeyIn, p: Principal = Depends(principal)) -> Dict[str, Any]:
         need(p, "keys:manage", body.project)
+        no_lockout()
         try:
             return directory.create_key(body.project, body.role, body.name, actor(p))
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
 
     @api.delete("/admin/keys/{key_id}", tags=["admin"])
-    def revoke_key(key_id: int, p: Principal = Depends(principal)) -> Dict[str, Any]:
+    def revoke_key(key_id: DbId, p: Principal = Depends(principal)) -> Dict[str, Any]:
         rows = store.query("SELECT project FROM api_keys WHERE id=?", (key_id,))
         if not rows:
             raise HTTPException(404, "key not found")
@@ -724,7 +851,7 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
 
     @api.get("/admin/audit", tags=["admin"])
     def audit_log(project: Optional[str] = None, actor_: Optional[str] = Query(None, alias="actor"),
-                  limit: int = Query(100, le=1000), before_seq: Optional[int] = None,
+                  limit: int = Query(100, ge=1, le=1000), before_seq: Optional[int] = Query(None, ge=0, le=INT64),
                   p: Principal = Depends(principal)) -> Dict[str, Any]:
         need(p, "audit:read")
         return {"entries": audit.list(project, actor_, limit, before_seq), "integrity": audit.verify()}
@@ -783,8 +910,6 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
 
     app.include_router(ingest)
     app.include_router(api)
-    if STATIC.exists():
-        app.mount("/static", StaticFiles(directory=STATIC), name="static")
     if web_available():
         @app.api_route("/{path:path}", methods=["GET", "HEAD"], include_in_schema=False)
         def web(path: str, request: Request):
@@ -792,7 +917,9 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
                 raise HTTPException(404, "not found")
             if path and not path.endswith("/") and "." not in path.rsplit("/", 1)[-1]:
                 query = ("?" + request.url.query) if request.url.query else ""
-                return RedirectResponse("/" + path + "/" + query, status_code=308)  # the export uses trailing slashes
+                # Leading slashes or backslashes would make "//evil.example" an off-site redirect.
+                local = "/" + path.lstrip("/\\")
+                return RedirectResponse(local + "/" + query, status_code=308)  # the export uses trailing slashes
             f = _web_file(path)
             if f is None:
                 missing = WEB / "404.html"
@@ -801,9 +928,9 @@ def create_app(store: Optional[SQLiteStore] = None, api_keys: Optional[List[str]
             # Hashed assets never change; pages must pick up a new build at once.
             cache = "public, max-age=31536000, immutable" if path.startswith("_next/static/") else "no-cache"
             return FileResponse(f, headers={"Cache-Control": cache})
-    elif STATIC.exists():
+    else:
         @app.get("/", include_in_schema=False)
-        def index() -> FileResponse:
-            return FileResponse(STATIC / "index.html")
+        def index() -> PlainTextResponse:
+            return PlainTextResponse(NO_WEB_APP)
 
     return app

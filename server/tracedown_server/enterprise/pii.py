@@ -27,6 +27,8 @@ import time
 from collections import Counter
 from typing import Any, Dict, List, Optional, Tuple
 
+import regex as _regex
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS pii_policies (
     project     TEXT PRIMARY KEY,
@@ -59,7 +61,9 @@ def _luhn(digits: str) -> bool:
 
 
 DETECTORS: Dict[str, Tuple[re.Pattern, Optional[Any]]] = {
-    "email": (re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"), None),
+    # Bounded lengths (RFC 5321: 64-character local part): unbounded ones take quadratic time on
+    # long runs of dots and digits, enough for one payload to stall the server.
+    "email": (re.compile(r"\b[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,253}\.[A-Za-z]{2,24}\b"), None),
     "credit_card": (re.compile(r"\b(?:\d[ -]?){12,18}\d\b"), _luhn),
     "us_ssn": (re.compile(r"\b(?!000|666|9\d\d)\d{3}-(?!00)\d{2}-(?!0000)\d{4}\b"), None),
     # Not inside a longer digit group (a card number that failed the Luhn check stays intact).
@@ -85,8 +89,23 @@ def validate(policy: Dict[str, Any]) -> Dict[str, Any]:
     for c in p["custom"]:
         if not c.get("name") or not c.get("pattern"):
             raise ValueError("custom detectors need name and pattern")
-        re.compile(c["pattern"])
+        if len(c["pattern"]) > 500:
+            raise ValueError(f"custom detector {c['name']!r}: patterns are limited to 500 characters")
+        if _NESTED.search(c["pattern"]):
+            raise ValueError(f"custom detector {c['name']!r}: a repeated group that itself repeats, like (a+)+, "
+                             "can take exponential time; rewrite it without the nested repetition")
+        try:
+            _regex.compile(c["pattern"])
+        except _regex.error as exc:
+            raise ValueError(f"custom detector {c['name']!r}: {exc}") from exc
     return p
+
+
+CUSTOM_TIMEOUT_S = 0.25
+# A group containing + or * that is itself repeated: the classic catastrophic-backtracking shape.
+_NESTED = re.compile(r"\((?:[^()\\]|\\.)*[+*}](?:[^()\\]|\\.)*\)\s*(?:[+*]|\{\d*,)")
+# Only run a detector on text that could match it.
+_NEEDS = {"email": "@", "jwt": "eyJ"}
 
 
 class Scrubber:
@@ -94,7 +113,10 @@ class Scrubber:
         self.policy = validate(policy)
         self.rules: List[Tuple[str, re.Pattern, Any]] = [
             (name, *DETECTORS[name]) for name in ORDER if name in self.policy["detectors"]]
-        self.rules += [(c["name"], re.compile(c["pattern"]), None) for c in self.policy["custom"]]
+        # Custom patterns come from users, and a pattern's text cannot show every way it might take
+        # exponential time, so they run under the `regex` engine with a time limit (CUSTOM_TIMEOUT_S).
+        self.custom = [(c["name"], _regex.compile(c["pattern"])) for c in self.policy["custom"]]
+        self.slow: set = set()
         self.allow = set(self.policy["allow_fields"])
         self.counts: Counter = Counter()
 
@@ -105,12 +127,24 @@ class Scrubber:
 
     def text(self, s: str) -> str:
         for name, pattern, check in self.rules:
+            if _NEEDS.get(name, "") not in s:
+                continue
             def sub(m, name=name, check=check):
                 if check and not check(m.group(0)):
                     return m.group(0)
                 self.counts[name] += 1
                 return self._token(name, m.group(0))
             s = pattern.sub(sub, s)
+        for name, pattern in self.custom:
+            if name in self.slow:  # timed out once already: fail closed without trying again
+                return f"[{name.upper()}:SCAN_TIMEOUT]"
+            try:
+                s, n = pattern.subn(lambda m, name=name: self._token(name, m.group(0)), s, timeout=CUSTOM_TIMEOUT_S)
+            except TimeoutError:
+                self.slow.add(name)
+                self.counts["scan_timeout"] += 1
+                return f"[{name.upper()}:SCAN_TIMEOUT]"  # never pass on text that was not fully scanned
+            self.counts[name] += n
         return s
 
     def value(self, v: Any, key: Optional[str] = None) -> Any:

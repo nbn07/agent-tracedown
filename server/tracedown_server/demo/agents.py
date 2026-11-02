@@ -90,8 +90,10 @@ def refund_agent(message="I cancelled my annual plan after 10 days. How much wil
                 model="claude-haiku-4-5", provider="anthropic",
                 prompt={"system": "Answer only from context.", "context": context, "question": message})
         run.output(answer["text"])
-        # Found later: the current policy pays $80. Feedback marks the run failed.
-        run.fail("customer was quoted an incorrect refund amount")
+        # The current policy pays $80. A customer told $120 complains, which marks the run failed;
+        # a fixed replay that quotes $80 is a success.
+        if "$120" in answer["text"]:
+            run.fail("customer was quoted an incorrect refund amount")
         return run.trace_id
 
 
@@ -252,12 +254,14 @@ def injection_agent(message="Does the Acme X2 router support Wi-Fi 7?"):
                 follow_page_instructions, model="gpt-4o-mini", provider="openai",
                 prompt={"question": message, "pages": [p["text"] for p in pages]})
             step = json.loads(plan["text"])
-            if step.get("tool"):
+            emailed = bool(step.get("tool"))
+            if emailed:
                 tdn.tool_call(step["tool"], step["args"], lambda to, subject: {"sent": True})
             answer = tdn.llm_call(lambda p, **_: {"text": "Yes, the Acme X2 supports Wi-Fi 7."},
                                   model="gpt-4o-mini", provider="openai", prompt=message)
         run.output(answer["text"])
-        run.fail("agent emailed customer data to an outside address")
+        if emailed:
+            run.fail("agent emailed customer data to an outside address")
         return run.trace_id
 
 

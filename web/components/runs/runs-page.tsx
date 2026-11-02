@@ -56,7 +56,7 @@ export function RunsPage() {
         </Select>
       </div>
       {error ? <ErrorState error={error} onRetry={reload} /> : loading && !data ? <Loading rows={8} /> : !runs.length ? (
-        <Empty title="No runs yet">Instrument an agent with the SDK, import runs with <code className="font-mono">tracedown-import</code>, or run <code className="font-mono">python examples/run_demo.py --endpoint …</code>.</Empty>
+        <Empty title="No runs yet">Instrument an agent with the SDK, import runs with <code className="font-mono">tracedown-import</code>, or restart with <code className="font-mono">tracedown up</code> on an empty database to load the demo runs.</Empty>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-line bg-panel">
           <table className="w-full text-sm">

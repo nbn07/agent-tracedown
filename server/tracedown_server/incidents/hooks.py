@@ -136,13 +136,15 @@ def build_request(kind: str, config: Dict[str, Any], event: str, obj: Dict[str, 
 _SECRETISH = ("url", "key", "token", "secret", "password", "authorization", "auth", "header")
 
 
-def _redact(value: Any, key: str = "") -> Any:
-    """Mask every value under a secret-looking key, at any depth (headers included)."""
+def _redact(value: Any, key: str = "", inside: bool = False) -> Any:
+    """Mask every value under a secret-looking key, at any depth. Everything inside such a key is
+    masked too: custom headers like {"X-Sig": "..."} carry secrets under harmless-looking names."""
+    secret = inside or any(t in key.lower() for t in _SECRETISH)
     if isinstance(value, dict):
-        return {k: _redact(v, k) for k, v in value.items()}
+        return {k: _redact(v, k, secret) for k, v in value.items()}
     if isinstance(value, list):
-        return [_redact(v, key) for v in value]
-    if value and any(t in key.lower() for t in _SECRETISH):
+        return [_redact(v, key, secret) for v in value]
+    if value and secret:
         return "•••" + str(value)[-4:]
     return value
 
@@ -190,6 +192,9 @@ def create(store, kind: str, config: Dict[str, Any], events: Optional[List[str]]
     missing = [k for k in required if not config.get(k)]
     if missing:
         raise ValueError(f"{kind} hook needs {', '.join(missing)}")
+    wrong = [k for k in ("url", "api_url", "routing_key", "repo", "token") if k in config and not isinstance(config[k], str)]
+    if wrong:
+        raise ValueError(f"{', '.join(wrong)} must be text")
     dest = _destination(kind, config)
     if dest:
         check_destination(dest)

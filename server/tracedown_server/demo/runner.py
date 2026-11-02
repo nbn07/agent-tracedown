@@ -34,9 +34,13 @@ def _get(endpoint, path, wait=60.0):
             time.sleep(0.5)
 
 
-def _post(endpoint, path, payload=None):
+def _headers(api_key=None):
+    return {"Content-Type": "application/json", **({"Authorization": f"Bearer {api_key}"} if api_key else {})}
+
+
+def _post(endpoint, path, payload=None, api_key=None):
     req = urllib.request.Request(endpoint + path, data=json.dumps(payload or {}).encode(),
-                                 headers={"Content-Type": "application/json"}, method="POST")
+                                 headers=_headers(api_key), method="POST")
     with urllib.request.urlopen(req, timeout=10) as r:
         return json.loads(r.read())
 
@@ -69,18 +73,20 @@ class _Tap(tdn.MemoryExporter):
             self.inner.export(spans, blobs)
 
 
-def load(endpoint, verbose=True):
+def load(endpoint, verbose=True, api_key=None):
     """Send every demo run to ``endpoint`` (or keep them in memory when it is None).
+
+    ``api_key`` goes with every request (``tracedown up --read-only`` passes its start-up token).
 
     Returns ``(ids, tap, replay_id)``: the first run of each story, the exporter that saw
     every span, and the replayed calendar run."""
     say = print if verbose else (lambda *a, **k: None)
-    tap = _Tap(tdn.HttpExporter(endpoint, project="demo") if endpoint else None)
+    tap = _Tap(tdn.HttpExporter(endpoint, api_key=api_key, project="demo") if endpoint else None)
     tdn.init(project="demo", exporter=tap)
     if endpoint:  # example prices so the analytics page can show cost (USD per million tokens; not real list prices)
         req = urllib.request.Request(endpoint + "/api/v1/settings/prices", method="PUT",
                                      data=json.dumps({"gpt-4o-mini": {"input": 0.15, "output": 0.6}}).encode(),
-                                     headers={"Content-Type": "application/json"})
+                                     headers=_headers(api_key))
         urllib.request.urlopen(req, timeout=10).read()
     # Background first, so the stories end up at the top of the newest-first run list.
     say("drift demo: 40 SupportBot runs on prompt billing@v3, then 40 on billing@v4 …")
@@ -94,17 +100,17 @@ def load(endpoint, verbose=True):
             pass
     ids = run_all()
     if endpoint:  # successful run: analysis is on demand
-        _post(endpoint, f"/api/v1/runs/{ids['pricing']}/analyze")
+        _post(endpoint, f"/api/v1/runs/{ids['pricing']}/analyze", api_key=api_key)
 
     # Replay the calendar failure with the fix, reusing every recorded step before it.
-    bundle = tdn.fetch_bundle(endpoint, ids["calendar"]) if endpoint else \
+    bundle = tdn.fetch_bundle(endpoint, ids["calendar"], api_key) if endpoint else \
         {"spans": tap.trace(ids["calendar"]), "blobs": tap.blobs}
     with tdn.replay(bundle, mode="from-step", from_step=4):
         replay_id = demo.calendar_agent(extractor=demo.extract_event_fixed)
     if endpoint:  # try Tracedown's own suggested fixes, so the Fixes tab shows results
         stand_ins = {"calendar_create_event": demo.create_event}
         for story in ("calendar", "refund", "pricing", "injection"):
-            for r in tdn.try_fixes(ids[story], agent=demo.ALL[story], tools=stand_ins, tries=1, endpoint=endpoint):
+            for r in tdn.try_fixes(ids[story], agent=demo.ALL[story], tools=stand_ins, tries=1, endpoint=endpoint, api_key=api_key):
                 say(f"fix for {story}: {r['verdict']}")
     return ids, tap, replay_id
 

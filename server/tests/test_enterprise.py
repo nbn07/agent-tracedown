@@ -74,12 +74,24 @@ def test_rbac_keys_roles_and_project_isolation(mem):
     assert c.get("/api/v1/runs", headers=H(viewer_a)).status_code == 401    # revoked
 
 
-def test_open_mode_closes_once_a_key_exists(mem):
+def test_open_mode_cannot_be_locked_by_creating_the_first_key_or_user(mem):
+    """Creating a key or user on an open server used to close it, locking everyone out (and a
+    viewer key could not undo it). Keys need an owner key from TDN_API_KEYS (or SSO) first."""
     c = TestClient(create_app(store=SQLiteStore(":memory:"), api_keys=[], queue=False))
     assert c.get("/api/v1/me").json()["open_mode"] is True
-    key = c.post("/api/v1/admin/keys", json={"project": "p", "role": "admin"}).json()["key"]
-    assert c.get("/api/v1/runs").status_code == 401
-    assert c.get("/api/v1/runs", headers={"Authorization": f"Bearer {key}"}).status_code == 200
+    r = c.post("/api/v1/admin/keys", json={"project": "p", "role": "viewer"})
+    assert r.status_code == 409 and "TDN_API_KEYS" in r.json()["detail"]
+    r = c.post("/api/v1/admin/users", json={"email": "a@b.c", "roles": {"p": "superuser"}})
+    assert r.status_code == 409
+    assert c.get("/api/v1/runs").status_code == 200 and c.get("/api/v1/me").json()["open_mode"] is True
+
+
+def test_invite_checks_roles_before_saving(mem):
+    boot = {"Authorization": "Bearer boot"}
+    c = TestClient(create_app(store=SQLiteStore(":memory:"), api_keys=["boot"], queue=False))
+    r = c.post("/api/v1/admin/users", json={"email": "a@b.c", "roles": {"p": "superuser"}}, headers=boot)
+    assert r.status_code == 422
+    assert all(u["email"] != "a@b.c" for u in c.get("/api/v1/admin/users", headers=boot).json()["users"])
 
 
 # ----------------------------------------------------------------------------- SSO
