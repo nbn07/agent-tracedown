@@ -125,6 +125,7 @@ def has_side_effects(span: Dict[str, Any], declared: Dict[str, Any]) -> bool:
 
 # Errors that mean "the service or network failed", as opposed to "the system said no".
 _INFRA = re.compile(r"\b(5\d\d|timed? ?out|timeout|unavailable|connection|refused to connect|reset by peer|"
+                    r"(?:service|server|api|host|backend|database|db) (?:is )?down|outage|unreachable|econnrefused|"
                     r"internal (server )?error|bad gateway|service error|rate.?limit|429|throttl)", re.I)
 
 

@@ -7,7 +7,9 @@ Every setting is an environment variable prefixed `TDN_`. The same variables wor
 | `TDN_DB` | SQLite path for metadata (single-process setups) |
 | `TDN_DATABASE_URL` | Postgres for metadata, e.g. `postgresql://user:pass@host/tracedown` (`TDN_DATABASE_POOL` connections per process) |
 | `TDN_REDIS_URL` | Redis: shared read cache, live feed across replicas, ingest rate limits (`TDN_CACHE_TTL`, `TDN_INGEST_RATE_LIMIT`) |
-| `TDN_API_KEYS` | Bootstrap owner keys (comma-separated). Without keys, users or this, the server runs open (dev) |
+| `TDN_API_KEYS` | Bootstrap owner keys (comma-separated). Without keys, users or this, the server runs open (dev): no login, writes accepted only from its own pages, and a `tracedown up` on localhost answers only to local host names. Keys and users can only be created once an owner key or SSO is set up |
+| `TDN_ALLOWED_HOSTS` | Extra host names an open `tracedown up` on localhost answers to (comma-separated; `*` for any) |
+| `TDN_MAX_BODY_MB`, `TDN_MAX_SPANS_PER_REQUEST` | Ingest limits (default 20 MB per request, 10,000 spans per batch) |
 | `TDN_AUTH=required` | Refuse open mode even on a fresh install |
 | `TDN_JUDGE` | Optional LLM judge, e.g. `anthropic:claude-sonnet-5-5` (most accurate on Who&When so far), `anthropic:claude-haiku-5-5` (cheaper) or `openai:gpt-5.4-mini` (uses `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`). For OpenAI-compatible servers such as vLLM or Ollama, also set `OPENAI_BASE_URL` |
 | `TDN_OIDC_ISSUER`, `_CLIENT_ID`, `_CLIENT_SECRET`, `_REDIRECT_URI`, `_ROLE_MAP`, `_ALLOWED_DOMAINS` | Single sign-on |

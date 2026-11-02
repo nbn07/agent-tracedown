@@ -36,8 +36,10 @@ def _wait_until_up(url: str, server, timeout: float = 20.0) -> bool:
     return False
 
 
-def _has_runs(url: str) -> bool:
-    with urllib.request.urlopen(url + "/api/v1/runs?limit=1", timeout=10) as r:
+def _has_runs(url: str, token: str = None) -> bool:
+    req = urllib.request.Request(url + "/api/v1/runs?limit=1",
+                                 headers={"Authorization": f"Bearer {token}"} if token else {})
+    with urllib.request.urlopen(req, timeout=10) as r:
         return bool(json.loads(r.read()).get("runs"))
 
 
@@ -94,6 +96,13 @@ def up(args: argparse.Namespace) -> int:
     local = "127.0.0.1" if args.host in ("0.0.0.0", "::", "") else args.host  # where this process reaches itself
     url = f"http://{local}:{port}"
     app = create_app()
+    from .api import LOCAL_HOSTS
+    if args.host in LOCAL_HOSTS:  # on localhost, an open server answers only to local names (DNS rebinding)
+        app.state.allowed_hosts = LOCAL_HOSTS
+    token = None
+    if args.read_only:  # nobody but the demo loader gets in until read-only mode is on
+        import secrets
+        token = app.state.loading_token = "load-" + secrets.token_hex(16)
     server = uvicorn.Server(uvicorn.Config(app, host=args.host, port=port, log_level="warning"))
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
@@ -101,12 +110,13 @@ def up(args: argparse.Namespace) -> int:
         print("The server did not start. Run `tracedown-server` to see the error.", file=sys.stderr)
         return 1
 
-    if not args.no_demo and not _has_runs(url):
+    if not args.no_demo and not _has_runs(url, token):
         print("Loading the demo runs …", flush=True)
         from .demo.runner import load
-        load(url, verbose=False)
+        load(url, verbose=False, api_key=token)
     if args.read_only:
-        app.state.read_only = True  # after loading the demo: from now on, nobody can write
+        app.state.read_only = True  # from now on, nobody can write
+        app.state.loading_token = None
 
     page = url + "/runs/" if web_available() else url + "/"
     where = f"   (listening on {args.host}:{port})" if local != args.host else ""
@@ -114,8 +124,8 @@ def up(args: argparse.Namespace) -> int:
     if args.read_only:
         print("Read-only: every write is refused from now on.")
     if not web_available():
-        print("This install has no bundled web app, so you get the simple viewer. For the full one: "
-              "cd web && npm install && npm run dev")
+        print("This copy has no web app built in (the API works). Build it once with: "
+              "node web/scripts/build-static.mjs")
     print("Press Ctrl+C to stop.\n")
     if not args.no_open:
         try:
