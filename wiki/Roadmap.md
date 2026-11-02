@@ -13,6 +13,7 @@ What's done, what's being built, and what's next. Requests with a real failing r
 | 0.4.3 | "Top suspect" instead of confidence numbers, after measuring that scores don't predict correctness; Sonnet judge results published |
 | 0.5.0 | Proven fixes: suggested fixes, tried by replaying the run and checked (below) |
 | 0.6.0 | MCP server: `tracedown mcp` lets Claude Code, Cursor and other MCP clients ask why a run failed and what fix works |
+| 0.6.1 | Fixes from a full test campaign: security (read-only demo, cross-site and DNS-rebinding protection for open servers, PII scrubbing time limits, input limits), consistent demo replays, clearer outage diagnosis |
 
 ## v0.5.0 "Proven fixes" (released)
 
