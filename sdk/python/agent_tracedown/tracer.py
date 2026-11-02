@@ -25,7 +25,7 @@ from typing import Any, Callable, Dict, Iterator, List, Optional
 from .exporters import ConsoleExporter, Exporter, HttpExporter
 from .spans import Span, new_trace_id
 
-SDK_VERSION = "0.5.0"
+SDK_VERSION = "0.6.0"
 
 
 # --------------------------------------------------------------------------- config

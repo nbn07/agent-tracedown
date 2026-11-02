@@ -154,6 +154,12 @@ Each adapter is tested in CI against the real library: LangGraph 1.2, openai-age
 
 Tracedown also exports: OTLP to Jaeger, Tempo, Datadog or any collector, and Prometheus metrics at `/metrics`.
 
+**Ask your coding assistant.** `tracedown mcp` lets Claude Code, Cursor or any MCP client ask "why did this run fail, and what fix works?" ([setup](docs/mcp.md)):
+
+```bash
+claude mcp add tracedown -- uvx --from "agent-tracedown-server[mcp]" tracedown mcp
+```
+
 ## Benchmarks
 
 [Who&When](realworld/whowhen/README.md) (ICML 2025) asks which step caused each of 184 failed multi-agent runs, labelled by people. Exact match, one run, no tuning on this data:
@@ -248,7 +254,6 @@ helm install tracedown deploy/helm/tracedown
 ## Roadmap
 
 - **Proven fixes in TypeScript**, and suggestions worded by the LLM judge when one is turned on
-- **MCP server**, to ask "why did run X fail?" from Claude Code, Cursor or any MCP client
 - **GitHub Action** that runs your agent's test conversations on every pull request
 - **Write-back to Langfuse and Phoenix**, so the verdict appears in the tool you already use
 
