@@ -21,7 +21,7 @@ Eleven rule-based detectors read the run. Each one looks for one kind of problem
 
 | Detector | Looks for |
 |---|---|
-| Tool errors | A tool call that failed, or got arguments its schema rejects. When a state-changing call failed and the final answer still says it worked ("Your order is confirmed"), the evidence says so |
+| Tool errors | A tool call that failed, or got arguments its schema rejects. When a state-changing call failed and the final answer still says it worked ("Your order is confirmed," "the refund was issued," or "it’s on its way"), the evidence says so |
 | Wrong tool | Tool X was called where tool Y fits: the arguments fail X's schema but fit Y's, or the request matches Y's description far better |
 | Point of no return | In a failed run, the first call that tried to change something (a refund, a booking). A prime suspect, not proof, so it ranks below direct evidence |
 | Loops | The same tool called three or more times with identical arguments, or the step budget exceeded |
