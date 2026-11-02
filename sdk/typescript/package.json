@@ -1,6 +1,6 @@
 {
   "name": "agent-tracedown",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "The flight recorder for AI agents: find the step that caused a failure, then replay the run with a fix. TypeScript SDK.",
   "license": "Apache-2.0",
   "author": "Naveen Nair",

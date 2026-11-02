@@ -1,6 +1,6 @@
 {
   "name": "tracedown-web",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "description": "Tracedown web app: runs, root-cause graphs, incidents, drift, analytics and live feed.",
   "scripts": {
