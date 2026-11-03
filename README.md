@@ -124,7 +124,8 @@ AgentFailureException: Invalid tool arguments
 
 Beyond single runs, Tracedown checks each claim in an answer against its sources, compares runs across prompt and model versions, groups failures into incidents with Slack, PagerDuty or GitHub alerts, and shows cost per run, step, model and agent.
 
-<p align="center"><img src="web/docs-screenshots/run-detail.png" alt="Run detail in the web app: the AI stack trace, who is at fault, and the step graph with the cause highlighted" width="820"></p>
+<p align="center"><img src="docs/demo/webapp-fix.gif" alt="In the web app: a failed CalendarAssistant run opens with its AI stack trace, root cause (bad LLM output at step 4) and who is at fault; the Fixes tab shows the suggested prompt change marked Works after a replay, and the comparison shows the replay succeeded with an ISO date instead of 'Friday'." width="820"></p>
+<p align="center"><sub>The web app, from a failed run to a proven fix. Recorded from <code>tracedown up</code> with the bundled demo runs.</sub></p>
 
 ## Integrations
 
