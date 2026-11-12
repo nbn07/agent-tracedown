@@ -26,6 +26,7 @@ tdn.init(project="support-bot", endpoint="http://127.0.0.1:7070")
 | AutoGen AgentChat | `async for m in tdn_ag.trace_stream(team.run_stream(task=t), name="Team")` |
 | Semantic Kernel | `tdn_sk.instrument(kernel)` |
 | LlamaIndex | `tdn_li.instrument()` |
+| DSPy | `tdn_dspy.instrument()` |
 | OpenAI and Anthropic clients | `tdn.plugins.instrument("openai", client)` |
 | Vercel AI SDK (TypeScript) | `generateText({ model: traceModel(model), tools: traceTools(tools) })` |
 | OpenAI Agents SDK (TypeScript) | `await instrument()` from `agent-tracedown/openai-agents` |
