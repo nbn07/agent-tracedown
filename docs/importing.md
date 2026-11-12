@@ -30,6 +30,8 @@ tracedown-import otlp traces.json --failed              # an OTLP/JSON file; --f
 
 Each run's diagnosis is printed in the terminal. Add `--send http://127.0.0.1:7070` to also store the runs in a Tracedown server, and `--judge anthropic:<model>` or `--judge openai:<model>` for an LLM second opinion on weak findings.
 
+With `--write-back`, each Langfuse diagnosis is also posted back to its trace: a CATEGORICAL score named `tracedown.root_cause` (the value is the root-cause category, so failures can be grouped by cause in Langfuse) and a comment with the cause, the step it points at, and the suggested fix. A trace that already has a `tracedown.root_cause` score is left alone, so re-running an import does not post duplicates; posting failures are reported as warnings and never lose the local diagnosis. The `TDN_LANGFUSE_WRITEBACK=1` environment variable turns write-back on without the flag.
+
 A step-by-step walkthrough with a sample file: [Diagnose your Langfuse failures in 5 minutes](tutorials/langfuse.md).
 
 ## Send OpenTelemetry directly

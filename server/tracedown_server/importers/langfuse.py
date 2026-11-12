@@ -158,6 +158,21 @@ class LangfuseClient:
         except urllib.error.HTTPError as e:
             raise LangfuseError(e.code, e.read()[:300].decode(errors="replace"), path) from None
 
+    def post(self, path: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        req = urllib.request.Request(self.host + path, data=json.dumps(payload).encode(),
+                                     headers={"Authorization": self.auth, "Content-Type": "application/json",
+                                              "Accept": "application/json"}, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as r:
+                body = r.read()
+                return json.loads(body) if body else {}
+        except urllib.error.HTTPError as e:
+            raise LangfuseError(e.code, e.read()[:300].decode(errors="replace"), path) from None
+
+    def scores(self, trace_id: str, name: Optional[str] = None) -> List[Dict[str, Any]]:
+        page = self.get("/api/public/scores", {"traceId": trace_id, "name": name, "limit": 100})
+        return page.get("data", [])
+
     def observations(self, trace_id: Optional[str] = None, since: Optional[datetime] = None,
                      level: Optional[str] = None, limit: int = 1000) -> List[Dict[str, Any]]:
         """Observations API v2 (cursor pages); falls back to v1 (page numbers) on older servers."""
