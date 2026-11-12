@@ -4,7 +4,7 @@ import json
 import pytest
 
 import agent_tracedown as tdn
-from agent_tracedown.redaction import default_redactor
+from agent_tracedown.redaction import default_redactor, redact_text
 
 
 @pytest.fixture()
@@ -78,6 +78,28 @@ def test_redaction_and_capture_off():
     with tdn.run("Bot", input="secret"):
         pass
     assert exporter2.blobs == {} and exporter2.spans[0]["input_digest"].startswith("sha256:")
+
+
+def test_redaction_covers_jwt_ip_and_iban():
+    jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3AA"
+    assert redact_text(f"tok {jwt}") == "tok [JWT]"
+    # Near misses: a lone header segment and a two-segment string are not JWTs.
+    assert redact_text("eyJhbGciOiJIUzI1NiJ9") == "eyJhbGciOiJIUzI1NiJ9"
+    assert redact_text("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0") == "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0"
+
+    assert redact_text("from 192.168.1.10 and 10.0.0.255") == "from [IP] and [IP]"
+    # Near misses: an out-of-range octet and a three-part string are not IPv4.
+    assert redact_text("300.1.2.3") == "300.1.2.3"
+    assert redact_text("1.2.3") == "1.2.3"
+    # Chosen rule (see redaction.py): a dotted quad with all octets in 0-255 is
+    # treated as an IP even when it could be a version number.
+    assert redact_text("1.2.3.4") == "[IP]"
+
+    assert redact_text("iban GB29 NWBK 6016 1331 9268 19") == "iban [IBAN]"
+    assert redact_text("iban DE89370400440532013000") == "iban [IBAN]"
+    # Near misses: too short to be an IBAN.
+    assert redact_text("GB29 NWBK") == "GB29 NWBK"
+    assert redact_text("DE89 3704") == "DE89 3704"
 
 
 def _agent(llm_fn):
