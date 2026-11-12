@@ -29,6 +29,7 @@ tdn.init(project="support-bot", endpoint="http://127.0.0.1:7070")
 | OpenAI and Anthropic clients | `tdn.plugins.instrument("openai", client)` |
 | Vercel AI SDK (TypeScript) | `generateText({ model: traceModel(model), tools: traceTools(tools) })` |
 | OpenAI Agents SDK (TypeScript) | `await instrument()` from `agent-tracedown/openai-agents` |
+| Mastra (TypeScript) | `instrument(agent)` from `agent-tracedown/mastra` |
 
 Python adapters live in `agent_tracedown.integrations`. Each one is tested in CI against the real library.
 

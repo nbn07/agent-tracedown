@@ -61,6 +61,15 @@ await instrument();                    // alongside OpenAI's own tracing
 
 Each SDK run becomes a Tracedown run with its agents, model calls, tool calls, hand-offs and guardrails.
 
+### Mastra
+
+```ts
+import { instrument } from "agent-tracedown/mastra";
+const recorder = instrument(agent);   // then call agent.generate(...) / agent.stream(...) as usual
+```
+
+Mastra has no global tracing hook, so the agent's methods are wrapped: each `generate` becomes a Tracedown run with a model step per step of the result and a tool step per tool call (arguments in, result or error out). `stream` runs are recorded once the stream's text settles.
+
 ### Anything else
 
 Wrap the model and tool calls with `tdn.llmCall` and `tdn.toolCall`, or send OpenTelemetry GenAI spans to the server's `/v1/traces` endpoint.
