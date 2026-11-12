@@ -124,6 +124,10 @@ def suggest_fix(category: str, target: Optional[str], finding: Dict[str, Any]) -
                         f"transient errors and a user-facing fallback.",
         "loop": f"The agent repeats {t} with identical arguments. Add a stop condition: dedupe identical calls, "
                 f"cap retries, and tell the model when a call returned nothing.",
+        "retry_storm": f"Calls to {t} keep failing with a transient error and are retried immediately, with no "
+                       f"wait between attempts. Add a retry policy with exponential backoff and jitter, cap the "
+                       f"number of retries, and honour Retry-After when the service sends it; if the error "
+                       f"persists, surface it to the user instead of retrying.",
         "context_window": "Prompts are near the context limit. Summarize or trim history and retrieved chunks, "
                           "or move to a model with a larger window.",
         "hallucination": "Answers contain claims that no source supports. Require citations for numbers, lower "

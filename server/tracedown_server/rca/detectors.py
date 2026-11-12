@@ -15,6 +15,7 @@ CATEGORY_LABELS = {
     "tool_failure": "Tool failure",
     "invalid_tool_args": "Invalid tool arguments",
     "loop": "Agent loop",
+    "retry_storm": "Retry storm",
     "retrieval_failure": "Retrieval failure",
     "stale_source": "Outdated retrieval source",
     "context_window": "Context window exhausted",
@@ -316,6 +317,63 @@ def loops(run: RunView) -> List[Finding]:
             category="loop", title=f"Run used {len(run.spans) - 1} steps, over its budget of {budget}",
             span_id=run.root["span_id"], step=0, confidence=0.8, detector="loops",
             evidence=[f"tdn.step_budget={budget}"]))
+    return out
+
+
+# A retry that starts more than this long after the previous attempt ended is a wait,
+# not a storm: back-off (or a human) had time to work.
+_STORM_GAP_MS = 1000.0
+
+
+@detector
+def retry_storms(run: RunView) -> List[Finding]:
+    """The same tool failing with a transient error again and again, retried immediately.
+
+    ``loops`` sees identical calls repeated; this sees the shape "same transient error,
+    no back-off": three or more failed calls to one tool whose error matches the
+    transient pattern (``_INFRA``: 429, 5xx, timeouts, rate limits), where each retry
+    starts within a second of the previous attempt ending. A retry after a real wait,
+    or one or two retries, stays quiet.
+    """
+    groups: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+    for s in run.of_kind("tool"):
+        if s["status"]["code"] == "ERROR" and _INFRA.search(s["status"]["message"] or ""):
+            groups[s["attributes"].get("gen_ai.tool.name", s["name"])].append(s)
+    out = []
+
+    def flush(tool: str, streak: List[Dict[str, Any]]) -> None:
+        if len(streak) < 3:
+            return
+        steps = [run.step(s) for s in streak]
+        gaps = []
+        for prev, cur in zip(streak, streak[1:]):
+            if prev.get("end_time") is not None and cur.get("start_time") is not None:
+                gaps.append(max(0.0, (cur["start_time"] - prev["end_time"]) / 1e6))
+        message = streak[0]["status"]["message"]
+        evidence = [f"{len(streak)} calls to {tool} failed with a transient error at steps {steps}",
+                    f"first error: {message}"]
+        if gaps:
+            evidence.append("gaps between retries: "
+                            + ", ".join(f"{g:.0f} ms" for g in gaps)
+                            + f" (a wait of {_STORM_GAP_MS:.0f} ms or more would break the storm)")
+        out.append(Finding(
+            category="retry_storm",
+            title=f"{tool}() retried {len(streak)} times on a transient error with no back-off: {message}",
+            span_id=streak[0]["span_id"], step=steps[0], confidence=0.85, detector="retry_storms",
+            evidence=evidence))
+
+    for tool, spans in groups.items():
+        streak = [spans[0]]
+        for prev, cur in zip(spans, spans[1:]):
+            gap = None
+            if prev.get("end_time") is not None and cur.get("start_time") is not None:
+                gap = (cur["start_time"] - prev["end_time"]) / 1e6
+            if gap is not None and gap > _STORM_GAP_MS:
+                flush(tool, streak)
+                streak = [cur]
+            else:
+                streak.append(cur)
+        flush(tool, streak)
     return out
 
 

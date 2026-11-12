@@ -17,7 +17,7 @@ flowchart LR
 
 ## 1. Detect
 
-Eleven rule-based detectors read the run. Each one looks for one kind of problem and reports a *finding*: the step, a category, a confidence and the evidence it saw.
+Twelve rule-based detectors read the run. Each one looks for one kind of problem and reports a *finding*: the step, a category, a confidence and the evidence it saw.
 
 | Detector | Looks for |
 |---|---|
@@ -25,6 +25,7 @@ Eleven rule-based detectors read the run. Each one looks for one kind of problem
 | Wrong tool | Tool X was called where tool Y fits: the arguments fail X's schema but fit Y's, or the request matches Y's description far better |
 | Point of no return | In a failed run, the first call that tried to change something (a refund, a booking). A prime suspect, not proof, so it ranks below direct evidence |
 | Loops | The same tool called three or more times with identical arguments, or the step budget exceeded |
+| Retry storms | The same tool failing with a transient error (429, 503, a timeout) three or more times, each retry starting within a second of the last attempt — no back-off |
 | Retrieval quality | A search that returned nothing, or returned sources marked outdated |
 | Prompt injection | Retrieved text or a tool result that gives the model orders ("ignore previous instructions…"). Strong when a later tool call uses an address or link that appears only in that text |
 | Context window | A prompt that filled 95% or more of the model's context window |
