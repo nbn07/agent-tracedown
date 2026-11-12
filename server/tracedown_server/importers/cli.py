@@ -8,6 +8,7 @@
     tracedown-import langfuse --errors-since 24h
     tracedown-import langfuse --trace-id 7f3a... --trace-id 9b21...
     tracedown-import langfuse-file trace.json     # a trace exported from the Langfuse UI or API
+    tracedown-import langsmith-file trace.json    # a run exported from LangSmith (root run or flat run list)
 
 By default each run is analyzed locally and its stack trace printed; nothing leaves your
 machine. ``--send http://localhost:7070`` also stores the runs in a Tracedown server
@@ -99,6 +100,9 @@ def main(argv: List[str] = None) -> int:
     lff = sub.add_parser("langfuse-file", help="Langfuse JSON export(s): a trace with observations, or observations")
     lff.add_argument("files", nargs="+")
     common(lff)
+    lsf = sub.add_parser("langsmith-file", help="LangSmith JSON export(s): a root run with child_runs, or a flat run list")
+    lsf.add_argument("files", nargs="+")
+    common(lsf)
     a = p.parse_args(argv)
 
     runs: List[Run] = []
@@ -111,6 +115,10 @@ def main(argv: List[str] = None) -> int:
         for f in a.files:
             obs, trace = load_file(f)
             runs += import_observations(obs, trace, failed=a.failed)
+    elif a.source == "langsmith-file":
+        from .langsmith import import_runs, load_file
+        for f in a.files:
+            runs += import_runs(load_file(f), failed=a.failed)
     else:
         from .langfuse import LangfuseClient, fetch_runs
         if not a.trace_id and not a.errors_since:

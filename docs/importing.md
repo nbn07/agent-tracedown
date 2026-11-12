@@ -1,12 +1,13 @@
 # Diagnose runs you already have
 
-No code changes to your agent. Tracedown reads exports from Langfuse, Arize Phoenix and any OpenTelemetry exporter.
+No code changes to your agent. Tracedown reads exports from Langfuse, LangSmith, Arize Phoenix and any OpenTelemetry exporter.
 
 ## Paste a trace
 
 In the web app, open **Diagnose a trace**, then paste or drop a file:
 
 - a Langfuse trace export (a trace with its observations, or a list of observations),
+- a LangSmith run export (a root run with its `child_runs`, or a flat list of runs linked by `parent_run_id`),
 - an OTLP/JSON export (one object, a list, or one object per line), for example from the OpenTelemetry Collector's file exporter or Arize Phoenix,
 - a Tracedown bundle (`GET /api/v1/runs/<id>/bundle`).
 
@@ -25,6 +26,7 @@ export LANGFUSE_PUBLIC_KEY=pk-lf-... LANGFUSE_SECRET_KEY=sk-lf-...
 tracedown-import langfuse --errors-since 24h            # every trace with an error in the last day
 tracedown-import langfuse --trace-id <id>               # one trace
 tracedown-import langfuse-file export.json              # a downloaded export
+tracedown-import langsmith-file export.json             # a LangSmith run export (root run or flat list)
 tracedown-import otlp traces.json --failed              # an OTLP/JSON file; --failed marks the runs failed
 ```
 
