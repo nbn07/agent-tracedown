@@ -45,6 +45,12 @@ tracedown up --db ~/team.db     # another database file
 tracedown demo                  # print the demo diagnoses in the terminal, no server
 ```
 
+Something not working? `tracedown doctor` checks the setup — Python version, the installed packages, the database path (and whether it sits in a synced folder), the web app, port 7070 and the `TDN_JUDGE` setting — and prints a short fix for anything it finds:
+
+```bash
+tracedown doctor
+```
+
 ## Next
 
 - [Diagnose runs you already have](importing.md), with no code changes.

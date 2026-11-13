@@ -3,6 +3,7 @@
     tracedown up              # server + web app on http://127.0.0.1:7070, with demo runs, opens the browser
     tracedown up --no-demo    # the same, starting empty, for your own runs
     tracedown demo            # print the demo diagnoses in the terminal, no server
+    tracedown doctor          # check the setup (Python, packages, database, port, judge) and explain problems
     tracedown mcp             # MCP server (stdio) for Claude Code, Cursor and other MCP clients
 
 ``tracedown-server`` stays the command for production (Postgres, Redis, several workers).
@@ -68,6 +69,114 @@ def default_db() -> str:
 def synced_folder(path: str) -> bool:
     p = os.path.abspath(path).replace("\\", "/").lower()
     return any(m in p for m in _SYNCED)
+
+
+# ----------------------------------------------------------------------------- doctor
+
+_JUDGE_KEYS = {"openai": "OPENAI_API_KEY", "anthropic": "ANTHROPIC_API_KEY"}
+
+
+def _doctor_python(version_info=None) -> tuple:
+    v = version_info or sys.version_info
+    line = f"Python {v[0]}.{v[1]}.{v[2]}"
+    if (v[0], v[1]) >= (3, 10):
+        return True, line
+    return False, (f"{line} is too old; Tracedown needs Python 3.10 or newer. "
+                   "On a Mac the built-in python3 is 3.9: let uv fetch a newer one, "
+                   "`uvx --python 3.12 --from agent-tracedown-server tracedown up`.")
+
+
+def _doctor_packages() -> list:
+    from importlib import metadata
+    out = []
+    for dist, install in (("agent-tracedown", "agent-tracedown"),
+                          ("agent-tracedown-server", "agent-tracedown-server")):
+        try:
+            out.append((True, f"{dist} {metadata.version(dist)} installed"))
+        except metadata.PackageNotFoundError:
+            out.append((False, f"{dist} is not installed. Fix: pip install {install}"))
+    return out
+
+
+def _doctor_db(path: str) -> tuple:
+    if path == ":memory:":
+        return True, "Database :memory: (nothing is kept between runs)"
+    path = os.path.abspath(os.path.expanduser(path))
+    if synced_folder(path):
+        return False, (f"Database {path} is in a cloud-synced folder (OneDrive, iCloud, Dropbox "
+                       "or Google Drive). Sync clients lock the file and writes then fail with "
+                       "\"attempt to write a readonly database\". Fix: move it to a local path, "
+                       "for example --db ~/.tracedown/tracedown.db")
+    if os.path.exists(path):
+        if not os.path.isfile(path):
+            return False, f"Database path {path} exists but is not a file. Fix: pass a file path with --db."
+        try:
+            with open(path, "ab"):
+                pass
+        except OSError as e:
+            return False, (f"Database {path} exists but is not writable ({e}). "
+                           "Fix: check the file permissions, or pass another path with --db.")
+        return True, f"Database {path} exists and is writable"
+    parent = os.path.dirname(path)
+    ancestor = parent
+    while not os.path.isdir(ancestor) and os.path.dirname(ancestor) != ancestor:
+        ancestor = os.path.dirname(ancestor)
+    if os.path.isdir(ancestor) and os.access(ancestor, os.W_OK):
+        return True, f"Database {path} does not exist yet; `tracedown up` will create it"
+    return False, (f"Database {path} does not exist and {parent} is not a writable folder. "
+                   "Fix: pass another path with --db, for example --db ~/.tracedown/tracedown.db")
+
+
+def _doctor_web() -> tuple:
+    from .api import web_available
+    if web_available():
+        return True, "Bundled web app is present"
+    return False, ("This copy has no web app built in (the API still works). "
+                   "Fix: build it once with `node web/scripts/build-static.mjs`, "
+                   "or reinstall agent-tracedown-server.")
+
+
+def _doctor_port(host: str, port: int) -> tuple:
+    if _port_free(host, port):
+        return True, f"Port {port} is free"
+    return False, (f"Port {port} is in use. `tracedown up` will take the next free port "
+                   f"({port + 1} and up) automatically, or stop the other program.")
+
+
+def _doctor_judge(env=None) -> tuple:
+    env = os.environ if env is None else env
+    spec = env.get("TDN_JUDGE")
+    if not spec:
+        return True, "TDN_JUDGE is not set (the optional LLM judge is off)"
+    provider, _, model = spec.partition(":")
+    key_var = _JUDGE_KEYS.get(provider)
+    if key_var is None or not model:
+        return False, (f"TDN_JUDGE={spec!r} is not a spec the judge understands. "
+                       "Fix: use openai:<model> or anthropic:<model>.")
+    if env.get(key_var):
+        return True, f"TDN_JUDGE is set ({provider}:{model}) and {key_var} is set"
+    return False, (f"TDN_JUDGE is set ({provider}:{model}) but {key_var} is not set, "
+                   f"so the judge cannot call the provider. Fix: export {key_var}=<your key> "
+                   "(the key itself is never printed).")
+
+
+def doctor(args: argparse.Namespace) -> int:
+    print("Checking your Tracedown setup:\n")
+    checks = [_doctor_python()]
+    checks += _doctor_packages()
+    checks.append(_doctor_db(args.db))
+    checks.append(_doctor_web())
+    checks.append(_doctor_port(args.host, args.port))
+    checks.append(_doctor_judge())
+    problems = 0
+    for ok, line in checks:
+        print(f"{'✓' if ok else '✗'} {line}")
+        problems += 0 if ok else 1
+    if problems:
+        print(f"\n{problems} problem(s) to fix above; everything else is fine.")
+        return 1
+    print("\nEverything checks out. Run `tracedown up` to start.")
+    return 0
 
 
 def up(args: argparse.Namespace) -> int:
@@ -169,6 +278,15 @@ def main(argv=None) -> int:
 
     d = sub.add_parser("demo", help="print the demo agents' diagnoses in the terminal, no server")
     d.set_defaults(func=demo)
+
+    doc = sub.add_parser("doctor", help="check the setup (Python, packages, database, port, judge) "
+                                        "and explain any problem it finds")
+    doc.add_argument("--host", default=os.environ.get("TDN_HOST", "127.0.0.1"))
+    doc.add_argument("--port", type=int, default=os.environ.get("TDN_PORT") or _DEFAULT_PORT,
+                     help="port to check (default: 7070, or TDN_PORT)")
+    doc.add_argument("--db", default=os.environ.get("TDN_DB") or default_db(),
+                     help="database file to check (default: the one `tracedown up` would use)")
+    doc.set_defaults(func=doctor)
 
     argv = sys.argv[1:] if argv is None else list(argv)
     if argv[:1] == ["mcp"]:  # its own options and --help
