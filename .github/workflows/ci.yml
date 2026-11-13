@@ -79,7 +79,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        extra: [langgraph, openai-agents, crewai, autogen, semantic-kernel, llamaindex, claude-agent-sdk, google-adk, pydantic-ai, mcp]
+        extra: [langgraph, openai-agents, crewai, autogen, semantic-kernel, llamaindex, claude-agent-sdk, google-adk, pydantic-ai, mcp, dspy]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
