@@ -144,6 +144,7 @@ Beyond single runs, Tracedown checks each claim in an answer against its sources
 | OpenAI and Anthropic clients | `tdn.plugins.instrument("openai", client)` |
 | Vercel AI SDK (TypeScript) | `generateText({ model: traceModel(model), tools: traceTools(tools) })` |
 | OpenAI Agents SDK (TypeScript) | `await instrument()` from `agent-tracedown/openai-agents` |
+| Mastra (TypeScript) | `instrument(agent)` from `agent-tracedown/mastra` |
 | Existing traces | Langfuse, Arize Phoenix, OpenInference, OpenLLMetry, any OTLP exporter |
 
 <details>

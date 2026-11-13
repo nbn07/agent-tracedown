@@ -35,6 +35,10 @@
     "./openai-agents": {
       "types": "./dist/integrations/openai-agents.d.ts",
       "default": "./dist/integrations/openai-agents.js"
+    },
+    "./mastra": {
+      "types": "./dist/integrations/mastra.d.ts",
+      "default": "./dist/integrations/mastra.js"
     }
   },
   "files": [
@@ -52,10 +56,14 @@
     "test": "node --import tsx --test test/*.test.ts"
   },
   "peerDependencies": {
+    "@mastra/core": ">=1.0",
     "@openai/agents": ">=0.1",
     "ai": ">=5"
   },
   "peerDependenciesMeta": {
+    "@mastra/core": {
+      "optional": true
+    },
     "ai": {
       "optional": true
     },
@@ -64,9 +72,10 @@
     }
   },
   "devDependencies": {
+    "@mastra/core": "^1.82.0",
     "@openai/agents": "^0.21.0",
     "@types/node": "^22.20.5",
-    "ai": "^7.0.159",
+    "ai": "^7.0.170",
     "ai-v5": "npm:ai@^5.0.283",
     "ai-v6": "npm:ai@^6.0.320",
     "tsx": "^4.20.6",
