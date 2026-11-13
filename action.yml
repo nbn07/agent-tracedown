@@ -1,0 +1,73 @@
+name: Tracedown
+description: >-
+  Run your agent in CI, post its Tracedown diagnosis (result and root cause
+  per conversation) as a PR comment, and fail the build when a conversation
+  that passed before now fails.
+inputs:
+  command:
+    description: "Command that runs your agent. Its runs must be exported to the server this action starts, at http://127.0.0.1:7070."
+    required: true
+  project:
+    description: "Only collect runs from this Tracedown project. Empty means every project."
+    default: ""
+  baseline:
+    description: "Path to the baseline file holding each conversation's last outcome. Persist it between runs (for example with actions/cache) or regressions cannot be detected."
+    default: "tracedown-baseline.json"
+  fail-on-regression:
+    description: "Fail the build when a conversation that passed in the baseline now fails."
+    default: "true"
+  comment:
+    description: "Post the report as a PR comment (needs a pull_request event and a token with pull-requests: write)."
+    default: "true"
+  python-version:
+    description: "Python version used to run Tracedown."
+    default: "3.12"
+  tracedown-version:
+    description: "Version of agent-tracedown-server to install. Empty means the latest release."
+    default: ""
+outputs:
+  regressions:
+    description: "Comma-separated names of the conversations that regressed."
+    value: ${{ steps.report.outputs.regressions }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+    - name: Install Tracedown
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.tracedown-version }}" ]; then
+          pip install "agent-tracedown-server==${{ inputs.tracedown-version }}"
+        else
+          pip install agent-tracedown-server
+        fi
+    - name: Start the Tracedown server
+      shell: bash
+      run: |
+        nohup tracedown-server --host 127.0.0.1 --port 7070 \
+          --db "$RUNNER_TEMP/tracedown-action.db" > "$RUNNER_TEMP/tracedown-server.log" 2>&1 &
+        for i in $(seq 1 30); do
+          if curl -sf http://127.0.0.1:7070/healthz > /dev/null; then exit 0; fi
+          sleep 1
+        done
+        echo "Tracedown server did not come up:"; cat "$RUNNER_TEMP/tracedown-server.log"; exit 1
+    - name: Run your agent
+      shell: bash
+      env:
+        TRACEDOWN_ENDPOINT: http://127.0.0.1:7070
+      run: ${{ inputs.command }}
+    - name: Report and check for regressions
+      id: report
+      if: always()
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        args=(--endpoint http://127.0.0.1:7070 --baseline "${{ inputs.baseline }}"
+              --repo "${{ github.repository }}" --pr "${{ github.event.pull_request.number }}")
+        if [ -n "${{ inputs.project }}" ]; then args+=(--project "${{ inputs.project }}"); fi
+        if [ "${{ inputs.fail-on-regression }}" != "true" ]; then args+=(--no-fail-on-regression); fi
+        if [ "${{ inputs.comment }}" != "true" ]; then args+=(--no-comment); fi
+        python -m tracedown_server.github_action "${args[@]}"

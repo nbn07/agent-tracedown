@@ -59,6 +59,7 @@ nav:
   - Running Tracedown:
       - Deployment: DEPLOYMENT.md
       - Configuration: CONFIGURATION.md
+      - GitHub Action: github-action.md
   - Reference:
       - Design: DESIGN.md
       - OpenTelemetry GenAI proposal: standards/otel-genai-proposal.md
