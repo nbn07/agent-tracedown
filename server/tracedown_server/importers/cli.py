@@ -16,7 +16,9 @@ machine. ``--send http://localhost:7070`` also stores the runs in a Tracedown se
 from __future__ import annotations
 
 import argparse
+import io
 import json
+import os
 import re
 import sys
 from datetime import datetime, timedelta, timezone
@@ -95,6 +97,9 @@ def main(argv: List[str] = None) -> int:
     lf.add_argument("--host", help="default: $LANGFUSE_HOST or https://cloud.langfuse.com")
     lf.add_argument("--public-key")
     lf.add_argument("--secret-key")
+    lf.add_argument("--write-back", action="store_true",
+                    help="post each diagnosis back to its Langfuse trace (a tracedown.root_cause score and a "
+                         "comment); also enabled by $TDN_LANGFUSE_WRITEBACK")
     common(lf)
     lff = sub.add_parser("langfuse-file", help="Langfuse JSON export(s): a trace with observations, or observations")
     lff.add_argument("files", nargs="+")
@@ -102,6 +107,7 @@ def main(argv: List[str] = None) -> int:
     a = p.parse_args(argv)
 
     runs: List[Run] = []
+    client = None
     if a.source == "otlp":
         from .otel import import_otlp, load_otlp_file
         for f in a.files:
@@ -131,8 +137,18 @@ def main(argv: List[str] = None) -> int:
         print(f"saved {len(runs)} run(s) to {a.save}")
     if a.send:
         send(runs, a.send, a.api_key, a.project)
-    if not a.quiet:
-        explain(runs, a.judge)
+    reports = explain(runs, a.judge) if not a.quiet else None
+    write_back_on = a.source == "langfuse" and (getattr(a, "write_back", False)
+                                                or os.environ.get("TDN_LANGFUSE_WRITEBACK", "").lower() in ("1", "true", "yes"))
+    if write_back_on and client is not None:
+        if reports is None:  # --quiet: still analyze, just don't print
+            reports = explain(runs, a.judge, out=io.StringIO())
+        from .langfuse_writeback import write_back
+        posted, warnings = write_back(client, [(tid, rep) for (tid, _, _), rep in zip(runs, reports)])
+        for w in warnings:
+            print(f"write-back failed: {w}", file=sys.stderr)
+        if posted:
+            print(f"wrote {posted} diagnosis(es) back to Langfuse")
     return 0
 
 
