@@ -15,6 +15,7 @@ that framework shows up with its agents, LLM calls, tools, retrievals and handof
 | AutoGen AgentChat | ``async for m in autogen.trace_stream(team.run_stream(task=t), ...)``|
 | Semantic Kernel   | ``semantic_kernel.instrument(kernel)`` inside ``tdn.run(...)``       |
 | LlamaIndex        | ``llamaindex.instrument()`` (span + event handlers)                  |
+| smolagents        | ``smolagents.instrument(agent)`` (wraps ``run``, adds a step callback) |
 
 Adapters import their framework lazily: installing ``agent-tracedown`` never pulls in
 a framework. Replay of adapter-traced runs works for steps that go through an

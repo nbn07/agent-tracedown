@@ -31,7 +31,7 @@ AI agents rarely crash. They fail quietly: a model writes "Friday" where a date 
 
 Tracedown is the flight recorder that also reads the recording. It walks back from the symptom to the step that caused it, and shows the evidence.
 
-- **Works with what you have.** Import failed runs from Langfuse, Arize Phoenix or any OpenTelemetry exporter with no code changes, or add one line to [13 frameworks](#integrations).
+- **Works with what you have.** Import failed runs from Langfuse, Arize Phoenix or any OpenTelemetry exporter with no code changes, or add one line to [14 frameworks](#integrations).
 - **Explains the failure.** The root cause, the evidence, and a verdict on who was at fault: the agent, or the user.
 - **Replays with your fix.** Earlier steps come from the recording; from the broken step on, the agent runs live with your change. Needs a run recorded with the SDK.
 - **Proves the fix works.** Tracedown suggests a fix, replays the run with it three times, and checks that the problem is gone and nothing new broke: `tdn.try_fixes(trace_id, agent=...)`. No tool runs for real during the check. Python SDK for now.
@@ -141,6 +141,7 @@ Beyond single runs, Tracedown checks each claim in an answer against its sources
 | AutoGen AgentChat | `async for m in tdn_ag.trace_stream(team.run_stream(task=t), name="Team")` |
 | Semantic Kernel | `tdn_sk.instrument(kernel)` |
 | LlamaIndex | `tdn_li.instrument()` |
+| smolagents | `tdn_smol.instrument(agent)` |
 | OpenAI and Anthropic clients | `tdn.plugins.instrument("openai", client)` |
 | Vercel AI SDK (TypeScript) | `generateText({ model: traceModel(model), tools: traceTools(tools) })` |
 | OpenAI Agents SDK (TypeScript) | `await instrument()` from `agent-tracedown/openai-agents` |
@@ -149,7 +150,7 @@ Beyond single runs, Tracedown checks each claim in an answer against its sources
 <details>
 <summary>Tested versions</summary>
 
-Each adapter is tested in CI against the real library: LangGraph 1.2, openai-agents 0.24, claude-agent-sdk 0.2, google-adk 2.13, pydantic-ai 2.64, mcp 1.30 and 2.3, CrewAI 1.15, AutoGen 0.7, Semantic Kernel 1.46, LlamaIndex 0.14, Vercel AI SDK 5 to 7, and @openai/agents 0.21. Python adapters live in `agent_tracedown.integrations`.
+Each adapter is tested in CI against the real library: LangGraph 1.2, openai-agents 0.24, claude-agent-sdk 0.2, google-adk 2.13, pydantic-ai 2.64, mcp 1.30 and 2.3, CrewAI 1.15, AutoGen 0.7, Semantic Kernel 1.46, LlamaIndex 0.14, smolagents 1.26, Vercel AI SDK 5 to 7, and @openai/agents 0.21. Python adapters live in `agent_tracedown.integrations`.
 
 </details>
 
