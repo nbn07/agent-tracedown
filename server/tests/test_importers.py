@@ -1,4 +1,4 @@
-"""Importers: OpenTelemetry (several attribute conventions) and Langfuse, into Tracedown runs."""
+"""Importers: OpenTelemetry (several attribute conventions), Langfuse and LangSmith, into Tracedown runs."""
 import base64
 import json
 import os
@@ -146,6 +146,56 @@ def test_langfuse_observation_list_without_trace_object_gets_a_synthetic_root():
     root = next(s for s in spans if s["parent_span_id"] is None)
     assert root["kind"] == "agent" and {s["parent_span_id"] for s in spans if s is not root} == {root["span_id"]}
     assert root["attributes"]["tdn.run.outcome"] == "failure"
+
+
+def test_langsmith_trace_export_nested_child_runs():
+    from tracedown_server.importers.langsmith import import_runs, load_file as ls_load
+    (tid, spans, blobs), = import_runs(ls_load(os.path.join(EX, "langsmith.json")))
+    assert tid == "ls-run-root"
+    names = _by_name(spans)
+    tool = names["get_refund_status"]
+    assert tool["kind"] == "tool" and tool["parent_span_id"] == "ls-run-root"
+    assert tool["status"]["code"] == "ERROR"
+    assert tool["status"]["message"] == "ValueError: order ORD-123 not found in the refund system"
+    llm = names["ChatOpenAI"]
+    assert llm["kind"] == "llm" and llm["attributes"]["gen_ai.request.model"] == "gpt-4o-mini"
+    assert llm["attributes"]["gen_ai.usage.input_tokens"] == 42
+    assert llm["attributes"]["gen_ai.usage.output_tokens"] == 11
+    root = next(s for s in spans if s["attributes"].get("tdn.run.root"))
+    assert root["name"] == "support-agent" and root["kind"] == "agent"
+    assert root["attributes"]["tdn.run.outcome"] == "failure"
+    assert root["attributes"]["tdn.import.source"] == "langsmith"
+    rep = analyze(spans, blobs)
+    assert rep["root_cause"]["category"] == "tool_failure" and rep["root_cause"]["step"] == tool["attributes"]["tdn.step"]
+
+
+def test_langsmith_flat_run_list_matches_the_nested_shape():
+    from tracedown_server.importers.langsmith import import_runs, load_file as ls_load
+    data = ls_load(os.path.join(EX, "langsmith.json"))
+    kids = data.pop("child_runs")
+    (tid, spans, _), = import_runs([data] + kids)
+    assert tid == "ls-run-root"
+    assert sorted(s["kind"] for s in spans) == ["agent", "llm", "tool"]
+    tool = next(s for s in spans if s["kind"] == "tool")
+    assert tool["parent_span_id"] == "ls-run-root" and tool["status"]["code"] == "ERROR"
+
+
+def test_langsmith_is_detected_for_pasted_traces():
+    from tracedown_server.importers.detect import detect, import_any
+    from tracedown_server.importers.langsmith import load_file as ls_load
+    data = ls_load(os.path.join(EX, "langsmith.json"))
+    assert detect(data) == "langsmith"
+    fmt, runs = import_any(data)
+    assert fmt == "langsmith" and len(runs) == 1
+
+
+def test_langsmith_cli_prints_a_diagnosis(capsys, tmp_path):
+    out = tmp_path / "runs.jsonl"
+    assert cli_main(["langsmith-file", os.path.join(EX, "langsmith.json"), "--save", str(out)]) == 0
+    text = capsys.readouterr().out
+    assert "support-agent" in text and "get_refund_status" in text
+    saved = [json.loads(line) for line in out.read_text().splitlines()]
+    assert saved[0]["trace_id"] == "ls-run-root" and saved[0]["spans"]
 
 
 def test_cli_prints_a_diagnosis(capsys, tmp_path):
