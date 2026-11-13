@@ -55,6 +55,7 @@ nav:
   - How Tracedown decides: HOW-IT-DECIDES.md
   - Benchmarks: benchmarks.md
   - Tutorials:
+      - Diagnose a CrewAI crew: tutorials/crewai.md
       - Langfuse in 5 minutes: tutorials/langfuse.md
   - Running Tracedown:
       - Deployment: DEPLOYMENT.md
