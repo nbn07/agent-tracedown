@@ -35,6 +35,14 @@
     "./openai-agents": {
       "types": "./dist/integrations/openai-agents.d.ts",
       "default": "./dist/integrations/openai-agents.js"
+    },
+    "./openai": {
+      "types": "./dist/integrations/openai.d.ts",
+      "default": "./dist/integrations/openai.js"
+    },
+    "./anthropic": {
+      "types": "./dist/integrations/anthropic.d.ts",
+      "default": "./dist/integrations/anthropic.js"
     }
   },
   "files": [
@@ -52,14 +60,22 @@
     "test": "node --import tsx --test test/*.test.ts"
   },
   "peerDependencies": {
+    "@anthropic-ai/sdk": ">=0.30",
     "@openai/agents": ">=0.1",
-    "ai": ">=5"
+    "ai": ">=5",
+    "openai": ">=4"
   },
   "peerDependenciesMeta": {
     "ai": {
       "optional": true
     },
     "@openai/agents": {
+      "optional": true
+    },
+    "@anthropic-ai/sdk": {
+      "optional": true
+    },
+    "openai": {
       "optional": true
     }
   },
