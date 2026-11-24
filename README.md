@@ -14,6 +14,7 @@ Your tracing tool shows what your agent did. Tracedown tells you which step brok
 [![npm](https://img.shields.io/npm/v/agent-tracedown?label=npm)](https://www.npmjs.com/package/agent-tracedown)
 [![Python](https://img.shields.io/badge/python-3.10%2B-3776AB)](sdk/python)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![nbn07/agent-tracedown MCP server](https://glama.ai/mcp/servers/nbn07/agent-tracedown/badges/score.svg)](https://glama.ai/mcp/servers/nbn07/agent-tracedown)
 
 **Works with** LangGraph · CrewAI · OpenAI Agents · Claude Agent SDK · Google ADK · Pydantic AI · Vercel AI SDK · MCP · Langfuse · Arize Phoenix · OpenTelemetry
 
