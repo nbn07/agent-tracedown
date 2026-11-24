@@ -99,6 +99,28 @@ test("redaction and capture off", async () => {
   assert.ok(root(mem.spans).input_digest);
 });
 
+test("redaction covers JWT, IP and IBAN", () => {
+  const jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3AA";
+  assert.equal(tdn.redactText(`tok ${jwt}`), "tok [JWT]");
+  // Near misses: a lone header segment and a two-segment string are not JWTs.
+  assert.equal(tdn.redactText("eyJhbGciOiJIUzI1NiJ9"), "eyJhbGciOiJIUzI1NiJ9");
+  assert.equal(tdn.redactText("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0"), "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0");
+
+  assert.equal(tdn.redactText("from 192.168.1.10 and 10.0.0.255"), "from [IP] and [IP]");
+  // Near misses: an out-of-range octet and a three-part string are not IPv4.
+  assert.equal(tdn.redactText("300.1.2.3"), "300.1.2.3");
+  assert.equal(tdn.redactText("1.2.3"), "1.2.3");
+  // Chosen rule (see redaction.ts): a dotted quad with all octets in 0-255 is
+  // treated as an IP even when it could be a version number.
+  assert.equal(tdn.redactText("1.2.3.4"), "[IP]");
+
+  assert.equal(tdn.redactText("iban GB29 NWBK 6016 1331 9268 19"), "iban [IBAN]");
+  assert.equal(tdn.redactText("iban DE89370400440532013000"), "iban [IBAN]");
+  // Near misses: too short to be an IBAN.
+  assert.equal(tdn.redactText("GB29 NWBK"), "GB29 NWBK");
+  assert.equal(tdn.redactText("DE89 3704"), "DE89 3704");
+});
+
 test("exact replay serves every step from the recording", async () => {
   let calls = 0;
   const agentFn = () => tdn.run("Bot", { input: "q" }, async run => {
