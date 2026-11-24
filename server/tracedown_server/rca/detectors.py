@@ -30,6 +30,7 @@ CATEGORY_LABELS = {
     "incomplete_task": "Task left incomplete",
     "policy_violation": "Policy violation",
     "prompt_injection": "Prompt injection",
+    "data_leak": "Private data leak",
 }
 
 
@@ -400,6 +401,104 @@ def prompt_injection(run: RunView) -> List[Finding]:
                            f"Instructions hidden in content from {where} at step {run.step(s)}"
                            + (f" were followed at step {run.step(used[0][0])}" if used else ""),
                            s["span_id"], run.step(s), 0.9 if used else 0.6, "prompt_injection", evidence))
+    return out
+
+
+# Personal values worth watching when they travel: addresses and numbers that identify a
+# person, as opposed to ids of things (orders, tickets), which tools pass around normally.
+_EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+_PHONE = re.compile(r"\b(?:\+?1[-. ]?)?\(?\d{3}\)?[-. ]\d{3}[-. ]\d{4}\b")
+_LONG_DIGITS = re.compile(r"\b\d{9,18}\b")
+# Argument keys whose value is free text a person may read, as opposed to an identifier
+# the receiving tool needs. A bare account number only counts as leaked in one of these.
+_TEXT_KEYS = ("message", "body", "text", "content", "note", "comment", "description",
+              "subject", "caption", "summary")
+
+
+def _personal_values(text: str) -> Dict[str, str]:
+    """value -> kind (\"email\" / \"phone\" / \"number\") found in a tool result.
+
+    A value that sits inside an injection window (the span of text
+    ``prompt_injection`` blames, from its match to 400 characters after) is left
+    out: a send driven by hidden instructions is that detector's story, and
+    this one is for leaks with no injection behind them.
+    """
+    windows = [(m.start(), m.end() + 400) for m in _INJECTION.finditer(text)]
+    found: Dict[str, str] = {}
+    for pattern, kind in ((_EMAIL, "email"), (_PHONE, "phone"), (_LONG_DIGITS, "number")):
+        for m in pattern.finditer(text):
+            if any(start <= m.start() < end for start, end in windows):
+                continue
+            found.setdefault(m.group(0), kind)
+    return found
+
+
+def _free_text(value: Any) -> str:
+    """The human-readable strings inside a tool call's arguments."""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        parts = []
+        for k, v in value.items():
+            if any(t in str(k).lower() for t in _TEXT_KEYS):
+                parts.append(_free_text(v))
+            elif isinstance(v, (dict, list)):
+                parts.append(_free_text(v))
+        return "\n".join(p for p in parts if p)
+    if isinstance(value, list):
+        return "\n".join(_free_text(v) for v in value)
+    return ""
+
+
+@detector
+def data_leak(run: RunView) -> List[Finding]:
+    """Private data read from one place, then sent somewhere the user did not ask for.
+
+    A value (email address, phone number, account number) appears in a read-only tool
+    result or a retrieval, and a later side-effecting call sends it, while the user's
+    request never mentions it. Unlike ``prompt_injection`` no hidden instruction is
+    needed: the agent copied the data on its own. Values the user typed stay quiet, as
+    does a bare number passed in an identifier argument (an order id doing its job);
+    a number only counts inside the free text of the outgoing call.
+    """
+    request = text_of(run.input(run.root))
+    declared = {t.get("name"): t for t in (run.root["attributes"].get("tdn.tools.available") or [])
+                if isinstance(t, dict)}
+    reads = []   # (span, {value: kind})
+    sends = []   # side-effecting tool spans
+    for s in run.spans:
+        if s["kind"] == "retrieval" or (s["kind"] == "tool" and not has_side_effects(s, declared)):
+            if s["status"]["code"] != "ERROR":
+                values = _personal_values(text_of(run.output(s)))
+                if values:
+                    reads.append((s, values))
+        elif s["kind"] == "tool":
+            sends.append(s)
+    out = []
+    reported = set()
+    for read_span, values in reads:
+        for value, kind in values.items():
+            if value in reported or value in request:
+                continue
+            for sink in sends:
+                if run.step(sink) <= run.step(read_span):
+                    continue
+                args = run.input(sink)
+                sent = value in _free_text(args) if kind == "number" else value in text_of(args)
+                if not sent:
+                    continue
+                reported.add(value)
+                src = read_span["attributes"].get("gen_ai.tool.name", read_span["name"])
+                dst = sink["attributes"].get("gen_ai.tool.name", sink["name"])
+                out.append(Finding(
+                    category="data_leak",
+                    title=f"{dst}() sent {value}, read at step {run.step(read_span)}, "
+                          f"which the user's request never mentions",
+                    span_id=sink["span_id"], step=run.step(sink), confidence=0.8, detector="data_leak",
+                    evidence=[f"step {run.step(read_span)} {src}() result contains {value}",
+                              f"step {run.step(sink)} {dst}() arguments include it",
+                              "the user's request does not mention it"]))
+                break
     return out
 
 

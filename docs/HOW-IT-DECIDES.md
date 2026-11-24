@@ -17,7 +17,7 @@ flowchart LR
 
 ## 1. Detect
 
-Eleven rule-based detectors read the run. Each one looks for one kind of problem and reports a *finding*: the step, a category, a confidence and the evidence it saw.
+Twelve rule-based detectors read the run. Each one looks for one kind of problem and reports a *finding*: the step, a category, a confidence and the evidence it saw.
 
 | Detector | Looks for |
 |---|---|
@@ -27,6 +27,7 @@ Eleven rule-based detectors read the run. Each one looks for one kind of problem
 | Loops | The same tool called three or more times with identical arguments, or the step budget exceeded |
 | Retrieval quality | A search that returned nothing, or returned sources marked outdated |
 | Prompt injection | Retrieved text or a tool result that gives the model orders ("ignore previous instructions…"). Strong when a later tool call uses an address or link that appears only in that text |
+| Private data leak | An email address, phone number or account number read from a tool result turns up in a later call that sends data out, when the user's request never mentioned it |
 | Context window | A prompt that filled 95% or more of the model's context window |
 | Memory consistency | A memory read that returns something different from what was written |
 | Planning | A decision step that chose an option whose precondition had failed |

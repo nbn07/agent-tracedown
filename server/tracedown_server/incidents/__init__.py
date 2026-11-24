@@ -139,6 +139,10 @@ def suggest_fix(category: str, target: Optional[str], finding: Dict[str, Any]) -
                            "that raised it.",
         "reported_failure": "Runs are reported as failed without a detected cause. Add retrieval/tool "
                             "instrumentation around the steps before the answer so the engine has evidence.",
+        "data_leak": f"Private data read from a tool result is sent on by {t}, to a place the user never "
+                     f"asked for. Only pass personal values (email addresses, phone numbers, account numbers) "
+                     f"to the tools that need them, mask them in messages and logs, and require confirmation "
+                     f"before sending personal data to a new recipient.",
     }
     return fixes.get(category, "Inspect the root-cause step in an affected run and replay it with a fix.")
 
